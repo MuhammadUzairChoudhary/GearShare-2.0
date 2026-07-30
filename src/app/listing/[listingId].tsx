@@ -1,29 +1,19 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { View, ScrollView } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { View, Animated, TouchableOpacity, Text, StatusBar } from 'react-native';
 import { Stack, useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { AppIcon } from '../../components/ui/Icons';
 import { useTheme } from '../../theme/ThemeContext';
-import { Screen } from '../../components/ui/Screen';
-import { AppText } from '../../components/ui/AppText';
-import { AppButton } from '../../components/ui/AppButton';
-import { IconButton } from '../../components/ui/IconButton';
-import { MoneyText } from '../../components/ui/MoneyText';
-import { Chip } from '../../components/ui/Chip';
-import { Divider } from '../../components/ui/Divider';
-import { Card } from '../../components/ui/Card';
-import { AvailabilityBadge } from '../../components/ui/AvailabilityBadge';
-import { ListingImageGallery } from '../../components/ui/ListingImageGallery';
-import { OwnerSummaryCard } from '../../components/ui/OwnerSummaryCard';
-import { LoadingState } from '../../components/feedback/LoadingState';
-import { ErrorState } from '../../components/feedback/ErrorState';
+import { fontFamilies } from '../../theme/typography';
+import { spacing, radius } from '../../theme/spacing';
+import { rf } from '../../theme/responsiveFont';
 import { useListing } from '../../hooks/useListings';
 import { useAuthContext } from '../../features/auth/AuthProvider';
 import type { PendingAuthIntent } from '../../types/auth-intent';
-import { spacing, minTouchSize } from '../../theme/spacing';
 import { ROUTES } from '../../constants/routes';
 import { getAnalyticsService } from '../../services/analytics';
-import { formatDailyPrice, formatMoney, calculateRentalDays } from '../../utils/money';
-import { mockReviews } from '../../mocks/data';
+import { formatMoney } from '../../utils/money';
+
 
 export default function ListingDetailScreen() {
   const { listingId } = useLocalSearchParams<{ listingId: string }>();
@@ -32,7 +22,24 @@ export default function ListingDetailScreen() {
   const { data: listing, isLoading, isError, refetch } = useListing(listingId ?? '');
   const [isSaved, setIsSaved] = useState(false);
 
-  const reviews = useMemo(() => mockReviews.filter((r) => r.listingId === listingId), [listingId]);
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  // ── Animated interpolations for collapsible header ──────────────
+  const headerBgOpacity = scrollY.interpolate({
+    inputRange: [120, 380],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  const collapsedTitleOpacity = scrollY.interpolate({
+    inputRange: [300, 380],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  const mainTitleOpacity = scrollY.interpolate({
+    inputRange: [300, 380],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
 
   const handleRequestRental = useCallback(() => {
     if (!isAuthenticated) {
@@ -44,35 +51,16 @@ export default function ListingDetailScreen() {
       router.push(ROUTES.AUTH.SIGN_IN);
       return;
     }
-
     getAnalyticsService().trackEvent({
       name: 'rental_request_started',
       params: { listingId: listingId ?? '' },
     });
-
-    router.push(`/rental/request/${listingId}` as any);
+    router.push(`/rental/${listingId}?demo=true` as any);
   }, [isAuthenticated, listingId, setPendingAction]);
-
-  const handleMessageOwner = useCallback(() => {
-    if (!isAuthenticated) {
-      const intent: PendingAuthIntent = {
-        type: 'message-owner',
-        listingId: listingId ?? '',
-        ownerId: listing?.ownerId ?? '',
-      };
-      setPendingAction(intent);
-      router.push(ROUTES.AUTH.SIGN_IN);
-      return;
-    }
-    router.push(ROUTES.TABS.INBOX);
-  }, [isAuthenticated, listingId, listing?.ownerId, setPendingAction]);
 
   const handleSaveListing = useCallback(() => {
     if (!isAuthenticated) {
-      const intent: PendingAuthIntent = {
-        type: 'save-listing',
-        listingId: listingId ?? '',
-      };
+      const intent: PendingAuthIntent = { type: 'save-listing', listingId: listingId ?? '' };
       setPendingAction(intent);
       router.push(ROUTES.AUTH.SIGN_IN);
       return;
@@ -91,17 +79,24 @@ export default function ListingDetailScreen() {
     });
   }, [listingId]);
 
+  // ── Loading / Error states ──────────────────────────────────────────
   if (isLoading) {
     return (
-      <Screen>
-        <LoadingState message="Loading listing..." />
-      </Screen>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md }}>
+          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.graphite300, opacity: 0.3 }} />
+          <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(14), color: colors.textSecondary }}>
+            Loading listing...
+          </Text>
+        </View>
+      </View>
     );
   }
 
   if (isError || !listing) {
     return (
-      <Screen>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         <Stack.Screen
           options={{
             headerShown: true,
@@ -109,278 +104,386 @@ export default function ListingDetailScreen() {
             headerStyle: { backgroundColor: colors.background },
             headerTintColor: colors.textPrimary,
             headerLeft: () => (
-              <IconButton
-                icon="arrow-back"
-                onPress={() => router.back()}
-                accessibilityLabel="Go back"
-              />
+              <TouchableOpacity onPress={() => router.back()} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+                <AppIcon name="back" size={20} color={colors.textPrimary} />
+              </TouchableOpacity>
             ),
           }}
         />
-        <ErrorState onRetry={() => refetch()} />
-      </Screen>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg, padding: spacing.xl }}>
+          <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
+          <Text style={{ fontFamily: fontFamilies.inter.medium, fontSize: rf(16), color: colors.textPrimary }}>
+            Could not load listing
+          </Text>
+          <TouchableOpacity
+            onPress={() => refetch()}
+            style={{ paddingHorizontal: 24, height: 44, backgroundColor: colors.carbon950, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(14), color: colors.white }}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     );
   }
 
-  const gearItem = listing.gearItem;
+  const gear = listing.gearItem;
   const owner = listing.owner;
-  const isAvailable = listing.availabilityStatus === 'available';
+  const estTotal = listing.dailyPrice * 3;
 
   return (
-    <Screen>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          headerTitle: gearItem?.name ?? 'Listing',
-          headerStyle: { backgroundColor: colors.background },
-          headerTintColor: colors.textPrimary,
-          headerLeft: () => (
-            <IconButton
-              icon="arrow-back"
-              onPress={() => router.back()}
-              accessibilityLabel="Go back"
-            />
-          ),
-          headerRight: () => (
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <IconButton
-                icon={isSaved ? 'heart' : 'heart-outline'}
-                onPress={handleSaveListing}
-                accessibilityLabel={isSaved ? 'Remove from saved' : 'Save listing'}
-                color={isSaved ? colors.error : colors.textPrimary}
-              />
-              <IconButton
-                icon="share-outline"
-                onPress={handleShareListing}
-                accessibilityLabel="Share listing"
-              />
-            </View>
-          ),
-        }}
-      />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <StatusBar barStyle="light-content" />
 
-      <ScrollView contentContainerStyle={{ paddingBottom: spacing.xxxxl }}>
-        {/* Image gallery */}
-        <ListingImageGallery
-          images={listing.images ?? []}
-          fallbackLabel={gearItem?.name ?? 'Equipment image'}
-        />
-        <View style={{ height: spacing.xxl }} />
+      {/* ── Header background (animated) ───────────────────── */}
+      <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 9, height: 100, backgroundColor: colors.white, opacity: headerBgOpacity }}>
+        <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 1, backgroundColor: '#DDE1E3' }} />
+      </Animated.View>
 
-        {/* Title & Price */}
-        <View style={{ gap: spacing.sm, marginBottom: spacing.xl }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-            }}
+      {/* ── Fixed header overlay (back, share, save, collapsed title) ── */}
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: 48, paddingBottom: 16 }}>
+        {/* Back button */}
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={{ width: 40, height: 40, backgroundColor: 'rgba(255,255,255,0.9)', borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}
+          accessibilityLabel="Go back"
+        >
+          <AppIcon name="back" size={14} color="#1F2225" />
+        </TouchableOpacity>
+
+        {/* Collapsed title (appears on scroll) — vertically centered with icons */}
+        <Animated.View style={{ position: 'absolute', left: 76, right: 116, top: 48, bottom: 16, opacity: collapsedTitleOpacity, justifyContent: 'center', alignItems: 'center' }}>
+          <Text numberOfLines={1} style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(16), lineHeight: rf(22), color: '#1F2225' }}>
+            {gear?.name ?? 'Listing'}
+          </Text>
+        </Animated.View>
+
+        {/* Share + Save */}
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity
+            onPress={handleShareListing}
+            style={{ width: 40, height: 40, backgroundColor: 'rgba(255,255,255,0.9)', borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}
+            accessibilityLabel="Share listing"
           >
-            <View style={{ flex: 1, gap: spacing.xs }}>
-              <AppText variant="displayMedium">{gearItem?.name ?? 'Equipment'}</AppText>
-              {(gearItem?.brand || gearItem?.model) && (
-                <AppText variant="bodyLarge" color="textSecondary">
-                  {[gearItem?.brand, gearItem?.model].filter(Boolean).join(' ')}
-                </AppText>
-              )}
-            </View>
+            <AppIcon name="share" size={14} color="#1F2225" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleSaveListing}
+            style={{ width: 40, height: 40, backgroundColor: 'rgba(255,255,255,0.9)', borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}
+            accessibilityLabel={isSaved ? 'Remove from saved' : 'Save listing'}
+          >
+            <AppIcon name={isSaved ? 'heart' : 'heart-outline'} size={16} color={isSaved ? '#EF4444' : '#1F2225'} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* ── Scrollable content (hero image + details) ──────────────── */}
+      <Animated.ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 112 }}
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
+        scrollEventThrottle={16}
+      >
+        {/* ── Hero Image — scrolls with content now ───────────────── */}
+        <View style={{ width: '100%', height: 400, backgroundColor: '#DDE1E3' }}>
+          {/* Placeholder image */}
+          <View style={{ flex: 1, backgroundColor: colors.graphite300, opacity: 0.3 }} />
+
+          {/* Pagination dots */}
+          <View style={{ position: 'absolute', bottom: 24, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: 'rgba(31,34,37,0.3)', borderRadius: 9999 }}>
+            <View style={{ width: 6, height: 6, backgroundColor: '#C8FF3D', borderRadius: 9999 }} />
+            <View style={{ width: 6, height: 6, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 9999 }} />
+            <View style={{ width: 6, height: 6, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 9999 }} />
+            <View style={{ width: 6, height: 6, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 9999 }} />
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <AvailabilityBadge status={listing.availabilityStatus} />
-            <Chip
-              label={
-                gearItem?.category?.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase()) ?? ''
-              }
-              variant="default"
-            />
+        </View>
+        {/* ── Listing Info ─────────────────────────────────────────── */}
+        <View style={{ paddingHorizontal: spacing.xl, paddingTop: 32, gap: 16 }}>
+          {/* Category */}
+          <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(10), lineHeight: rf(15), letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>
+            {gear?.category?.replace('_', ' / ').replace(/\b\w/g, (l) => l.toUpperCase()) ?? ''}
+          </Text>
+
+          {/* Title (fades out as user scrolls past image) */}
+          <Animated.Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(24), lineHeight: rf(32), letterSpacing: -0.6, color: '#1F2225', opacity: mainTitleOpacity }}>
+            {gear?.name ?? 'Listing'}
+          </Animated.Text>
+
+          {/* Rating + ID badges */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            {/* Rating badge */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: colors.white, borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 4 }}>
+              <Text style={{ fontSize: rf(11.25), color: '#FACC15', lineHeight: rf(12) }}>★</Text>
+              <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(10), lineHeight: rf(15), letterSpacing: -0.009, color: '#1F2225' }}>
+                {owner?.ratingAverage?.toFixed(1) ?? '5.0'} ({owner?.ratingCount ?? 0} reviews)
+              </Text>
+            </View>
+
+            {/* ID badge */}
+            <View style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#1F2225', borderRadius: 4 }}>
+              <Text style={{ fontFamily: fontFamilies.ibmPlexMono.regular, fontSize: rf(9), lineHeight: rf(14), letterSpacing: 0.9, textTransform: 'uppercase', color: colors.white }}>
+                ID: {listingId?.toUpperCase()?.slice(0, 8) ?? 'GS-000'}
+              </Text>
+            </View>
           </View>
         </View>
 
-        {/* Pricing bar */}
-        <Card style={{ marginBottom: spacing.xxl }}>
-          <View
-            style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
-          >
-            <View>
-              <MoneyText variant="dailyPrice" minorUnits={listing.dailyPrice} />
-              <AppText variant="bodySmall" color="textTertiary">
-                Min {listing.minRentalDuration} day{listing.minRentalDuration > 1 ? 's' : ''}
-              </AppText>
+        {/* ── Pricing Card ─────────────────────────────────────────── */}
+        <View style={{ marginHorizontal: spacing.xl, marginTop: 20, padding: spacing.xl, backgroundColor: '#F8F9F9', borderWidth: 1, borderColor: '#DDE1E3', borderRadius: radius.card }}>
+          {/* — Estimated Total Section — */}
+          <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(10), lineHeight: rf(15), letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)', marginBottom: 8 }}>
+            Estimated Total
+          </Text>
+
+          {/* Price row: €96.00  for 3 days */}
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 4, flexShrink: 1 }}>
+            <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(28), lineHeight: rf(34), letterSpacing: -0.5, color: '#1F2225' }}>
+              {formatMoney(estTotal)}
+            </Text>
+            <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: fontFamilies.inter.semiBold, fontSize: rf(14), lineHeight: rf(20), color: 'rgba(44,48,52,0.5)' }}>
+              for 3 days
+            </Text>
+          </View>
+
+          {/* Sub-text: (€32.00 / day) */}
+          <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: fontFamilies.inter.regular, fontSize: rf(12), lineHeight: rf(16), letterSpacing: 0.2, color: 'rgba(44,48,52,0.4)', marginBottom: 20 }}>
+            ({formatMoney(listing.dailyPrice)} / day)
+          </Text>
+
+          {/* — Divider — */}
+          <View style={{ height: 1, backgroundColor: '#ECEEEF', marginBottom: 20 }} />
+
+          {/* — Security Deposit Section — */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(10), lineHeight: rf(15), letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>
+                Security Deposit
+              </Text>
+              <AppIcon name="info" size={10} color="rgba(44,48,52,0.4)" />
             </View>
-            <AppText variant="bodySmall" color="textTertiary">
-              Deposit: {formatMoney(listing.depositAmount)}
-            </AppText>
+            <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(16), lineHeight: rf(22), letterSpacing: 0.015, color: '#1F2225' }}>
+              {formatMoney(listing.depositAmount)}
+            </Text>
           </View>
-        </Card>
+        </View>
 
-        {/* Owner */}
-        {owner && (
-          <View style={{ marginBottom: spacing.xxl }}>
-            <AppText variant="titleSmall" style={{ marginBottom: spacing.md }}>
-              Owner
-            </AppText>
-            <OwnerSummaryCard
-              owner={owner}
-              onPress={() => router.push(`/profile/${owner.id}` as any)}
-            />
+        {/* ── Technical Specifications ─────────────────────────────── */}
+        <View style={{ paddingHorizontal: spacing.xl, paddingTop: 24, gap: 16 }}>
+          <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(16), letterSpacing: 1.2, textTransform: 'uppercase', color: '#1F2225', paddingBottom: 8 }}>
+            Technical Specifications
+          </Text>
+          <View style={{ padding: spacing.lg, backgroundColor: '#F8F9F9', borderWidth: 1, borderColor: '#DDE1E3', borderRadius: radius.card }}>
+            <SpecRow label1="Weight (Total)" value1="1.28 kg" label2="Size Range" value2="0.3 – 4.0" />
+            <View style={{ height: 1, backgroundColor: '#ECEEEF' }} />
+            <SpecRow label1="Material" value1="Aircraft Aluminum" label2="Mfg Year" value2="2023" />
           </View>
-        )}
+        </View>
 
-        <Divider />
+        {/* ── Gear Condition ────────────────────────────────────────── */}
+        <View style={{ paddingHorizontal: spacing.xl, paddingTop: 24, gap: 16 }}>
+          <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(16), letterSpacing: 1.2, textTransform: 'uppercase', color: '#1F2225', paddingBottom: 8 }}>
+            Gear Condition
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 16, padding: spacing.lg, backgroundColor: '#F8F9F9', borderWidth: 1, borderColor: '#DDE1E3', borderRadius: radius.card }}>
+            {/* Icon box */}
+            <View style={{ width: 48, height: 48, backgroundColor: 'rgba(200,255,61,0.4)', borderRadius: 4, alignItems: 'center', justifyContent: 'center' }}>
+              <AppIcon name="flash" size={24} color="#1F2225" />
+            </View>
+            {/* Text */}
+            <View style={{ flex: 1, gap: 4.5 }}>
+              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(14), lineHeight: rf(20), letterSpacing: 0.002, textTransform: 'uppercase', color: '#1F2225' }}>
+                {gear?.condition?.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase()) ?? 'Good'}
+              </Text>
+              <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(12), lineHeight: rf(20), color: 'rgba(44,48,52,0.6)' }}>
+                {gear?.description?.slice(0, 120) ?? 'Well-maintained equipment. Ready for your adventure.'}
+              </Text>
+            </View>
+          </View>
+        </View>
 
-        {/* Description */}
-        {gearItem?.description && (
-          <View style={{ marginBottom: spacing.xxl }}>
-            <AppText variant="titleSmall" style={{ marginBottom: spacing.md }}>
+        {/* ── Gear Owner ───────────────────────────────────────────── */}
+        <View style={{ paddingHorizontal: spacing.xl, paddingTop: 24, gap: 16 }}>
+          <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(16), letterSpacing: 1.2, textTransform: 'uppercase', color: '#1F2225', paddingBottom: 8 }}>
+            Gear Owner
+          </Text>
+          <View style={{ padding: spacing.lg, backgroundColor: '#F8F9F9', borderWidth: 1, borderColor: '#DDE1E3', borderRadius: radius.card }}>
+            <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
+              {/* Avatar */}
+              <View style={{ width: 55.27, height: 56, position: 'relative' }}>
+                <View style={{ width: 55.27, height: 56, backgroundColor: colors.graphite300, borderRadius: 9999 }} />
+                {/* Verified badge */}
+                <View style={{ position: 'absolute', right: -4, bottom: -4, width: 20, height: 20, backgroundColor: colors.signalLime, borderWidth: 2, borderColor: '#F8F9F9', borderRadius: 9999, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: rf(7), color: '#1F2225', fontWeight: '700' }}>✓</Text>
+                </View>
+              </View>
+
+              {/* Info */}
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(14), lineHeight: rf(20), letterSpacing: 0.007, color: '#1F2225' }}>
+                  {owner?.fullName ?? 'Owner'}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(10), lineHeight: rf(15), letterSpacing: 0.006, color: 'rgba(44,48,52,0.6)' }}>
+                    {owner?.verificationStatus === 'verified' ? 'Verified Guide' : 'Member'}
+                  </Text>
+                  <View style={{ width: 3.94, height: 4, backgroundColor: '#CFD4D8', borderRadius: 9999 }} />
+                  <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(10), lineHeight: rf(15), letterSpacing: 0.005, color: 'rgba(44,48,52,0.6)' }}>
+                    {owner?.ratingCount ?? 0} Rentals
+                  </Text>
+                </View>
+                {/* Response time */}
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                  <AppIcon name="flash" size={8.75} color={colors.signalLime} />
+                  <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(9), lineHeight: rf(14), letterSpacing: 0.007, textTransform: 'uppercase', color: '#1F2225' }}>
+                    Responds in 5m
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Description ──────────────────────────────────────────── */}
+        <View style={{ paddingHorizontal: spacing.xl, paddingTop: 24, gap: 15 }}>
+          <View style={{ gap: 4 }}>
+            <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(16), letterSpacing: 1.2, textTransform: 'uppercase', color: '#1F2225' }}>
               Description
-            </AppText>
-            <AppText variant="bodyMedium" color="textSecondary">
-              {gearItem.description}
-            </AppText>
+            </Text>
+            <View style={{ height: 1, backgroundColor: '#ECEEEF' }} />
           </View>
-        )}
-
-        {/* Specifications */}
-        {gearItem?.specifications && Object.keys(gearItem.specifications).length > 0 && (
-          <View style={{ marginBottom: spacing.xxl }}>
-            <AppText variant="titleSmall" style={{ marginBottom: spacing.md }}>
-              Specifications
-            </AppText>
-            <Card padded>
-              <View style={{ gap: spacing.md }}>
-                {Object.entries(gearItem.specifications).map(([key, value]) => (
-                  <View key={key} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <AppText variant="bodyMedium" color="textSecondary">
-                      {key.charAt(0).toUpperCase() + key.slice(1)}
-                    </AppText>
-                    <AppText variant="bodyMedium">{value as string}</AppText>
-                  </View>
-                ))}
-              </View>
-            </Card>
-          </View>
-        )}
-
-        {/* Condition & Wear */}
-        {gearItem?.condition && (
-          <View style={{ marginBottom: spacing.xxl }}>
-            <AppText variant="titleSmall" style={{ marginBottom: spacing.md }}>
-              Condition
-            </AppText>
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <Chip
-                label={gearItem.condition
-                  .replace('_', ' ')
-                  .replace(/\b\w/g, (l) => l.toUpperCase())}
-                variant="default"
-              />
-            </View>
-          </View>
-        )}
-
-        {/* Included components */}
-        {gearItem?.includedComponents && gearItem.includedComponents.length > 0 && (
-          <View style={{ marginBottom: spacing.xxl }}>
-            <AppText variant="titleSmall" style={{ marginBottom: spacing.md }}>
-              Includes
-            </AppText>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-              {gearItem.includedComponents.map((component) => (
-                <Chip key={component} label={component} variant="default" />
-              ))}
-            </View>
-          </View>
-        )}
-
-        <Divider />
-
-        {/* Pickup area */}
-        {listing.pickupArea && (
-          <View style={{ marginBottom: spacing.xxl }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-              <Ionicons name="location-outline" size={18} color={colors.graphite500} />
-              <AppText variant="bodyMedium" color="textSecondary">
-                Pickup: {listing.pickupArea}
-              </AppText>
-            </View>
-          </View>
-        )}
-
-        {/* Reviews */}
-        {reviews.length > 0 && (
-          <View style={{ marginBottom: spacing.xxl }}>
-            <AppText variant="titleSmall" style={{ marginBottom: spacing.md }}>
-              Reviews ({reviews.length})
-            </AppText>
-            <View style={{ gap: spacing.md }}>
-              {reviews.slice(0, 3).map((review) => (
-                <Card key={review.id}>
-                  <View style={{ gap: spacing.sm }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                      <Chip label={`${review.rating.overall}/5`} variant="active" />
-                    </View>
-                    {review.feedback && (
-                      <AppText variant="bodyMedium" color="textSecondary">
-                        {review.feedback}
-                      </AppText>
-                    )}
-                  </View>
-                </Card>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Policies */}
-        <Divider />
-        {listing.policies && listing.policies.length > 0 && (
-          <View style={{ marginBottom: spacing.xxl }}>
-            <AppText variant="titleSmall" style={{ marginBottom: spacing.md }}>
-              Policies
-            </AppText>
-            <Card padded>
-              <View style={{ gap: spacing.md }}>
-                {listing.policies.map((policy, index) => (
-                  <View key={index} style={{ flexDirection: 'row', gap: spacing.sm }}>
-                    <AppText variant="bodyMedium" color="textTertiary">
-                      •
-                    </AppText>
-                    <AppText variant="bodyMedium" color="textSecondary" style={{ flex: 1 }}>
-                      {policy}
-                    </AppText>
-                  </View>
-                ))}
-              </View>
-            </Card>
-          </View>
-        )}
-
-        {/* Action buttons */}
-        <View style={{ gap: spacing.md }}>
-          {isAvailable ? (
-            <AppButton
-              title="Request Rental"
-              onPress={handleRequestRental}
-              variant="primary"
-              fullWidth
-              size="lg"
-            />
-          ) : (
-            <AppButton
-              title={
-                listing.availabilityStatus === 'unavailable'
-                  ? 'Currently Unavailable'
-                  : 'Already Booked'
-              }
-              onPress={() => {}}
-              variant="secondary"
-              fullWidth
-              disabled
-            />
+          <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(14), lineHeight: rf(23), color: '#1F2225' }}>
+            {gear?.description ?? 'No description available.'}
+          </Text>
+          {gear?.description && (
+            <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(14), lineHeight: rf(23), color: '#1F2225', marginTop: 8 }}>
+              Includes color-coded components for each piece. Perfect for your next adventure. These have been meticulously inspected after every use.
+            </Text>
           )}
-          <AppButton title="Message Owner" onPress={handleMessageOwner} variant="ghost" fullWidth />
         </View>
-      </ScrollView>
-    </Screen>
+
+        {/* ── Policies ─────────────────────────────────────────────── */}
+        <View style={{ paddingHorizontal: spacing.xl, paddingTop: 24, gap: 16, paddingBottom: 32 }}>
+          <View style={{ gap: 4 }}>
+            <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(16), letterSpacing: 1.2, textTransform: 'uppercase', color: '#1F2225' }}>
+              Platform Policies
+            </Text>
+            <View style={{ height: 1, backgroundColor: '#ECEEEF' }} />
+          </View>
+          <View style={{ gap: 16 }}>
+            {/* Cancellation */}
+            <View style={{ flexDirection: 'row', gap: 16 }}>
+              <View style={{ paddingTop: 4 }}>                 <AppIcon name="calendar" size={14} color="#1F2225" />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(12), lineHeight: rf(16), letterSpacing: -0.3, textTransform: 'uppercase', color: '#1F2225' }}>
+                  Cancellation Policy
+                </Text>
+                <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(11), lineHeight: rf(16), letterSpacing: -0.002, color: 'rgba(44,48,52,0.6)' }}>
+                  Full refund up to 48 hours before the start of the rental period. Cancellations after that may be subject to partial charges.
+                </Text>
+              </View>
+            </View>
+
+            {/* Damage */}
+            <View style={{ flexDirection: 'row', gap: 16 }}>
+              <View style={{ paddingTop: 4 }}>                 <AppIcon name="damage-protection" size={15.75} color="#1F2225" />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(12), lineHeight: rf(16), letterSpacing: -0.3, textTransform: 'uppercase', color: '#1F2225' }}>
+                  Damage Protection
+                </Text>
+                <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(11), lineHeight: rf(16), color: 'rgba(44,48,52,0.6)' }}>
+                  Renters are responsible for replacement costs of lost or non-functional equipment.
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Animated.ScrollView>
+
+      {/* ── Fixed Bottom Action Bar ────────────────────────────────── */}
+      <View style={{ paddingHorizontal: spacing.xl, paddingVertical: 18, backgroundColor: 'rgba(255,255,255,0.9)', borderTopWidth: 1, borderTopColor: '#DDE1E3' }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          {/* Left: Total + price + deposit hint */}
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(9), lineHeight: rf(14), letterSpacing: 0.9, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>
+              TOTAL (3 DAYS)
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(24), lineHeight: rf(32), letterSpacing: 0.001, color: '#1F2225' }}
+            >
+              {formatMoney(estTotal)}
+            </Text>
+            <Text numberOfLines={1} style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(9), lineHeight: rf(14), color: 'rgba(44,48,52,0.4)' }}>
+              ({formatMoney(listing.depositAmount)} deposit hold)
+            </Text>
+          </View>
+
+          {/* Right: Request Rental button */}
+          <TouchableOpacity
+            onPress={handleRequestRental}
+            activeOpacity={0.85}
+            style={{
+              paddingHorizontal: 24,
+              height: 56,
+              backgroundColor: colors.signalLime,
+              borderWidth: 1,
+              borderColor: colors.signalLime,
+              borderRadius: radius.button,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              shadowColor: 'rgba(200,255,61,0.2)',
+              shadowOffset: { width: 0, height: 10 },
+              shadowOpacity: 0.3,
+              shadowRadius: 15,
+              elevation: 6,
+            }}
+            accessibilityLabel="Rent Now"
+          >
+            <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(16), letterSpacing: 1.2, textTransform: 'uppercase', color: '#1F2225' }}>
+              Rent Now
+            </Text>
+            <AppIcon name="chevron-right" size={6.25} color="#1F2225" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ── Component: 2-column spec row (no divider — handled by parent) ──
+function SpecRow({
+  label1, value1, label2, value2,}: {
+  label1: string; value1: string; label2: string; value2: string;
+}): React.JSX.Element {
+  return (
+    <View style={{ flexDirection: 'row' }}>
+      <View style={{ flex: 1, paddingVertical: 8 }}>
+        <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(10), lineHeight: rf(15), letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>
+          {label1}
+        </Text>
+        <View style={{ paddingTop: 4 }}>
+          <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(12), lineHeight: rf(20), color: '#1F2225' }}>
+            {value1}
+          </Text>
+        </View>
+      </View>
+      <View style={{ flex: 1, paddingVertical: 8 }}>
+        <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(10), lineHeight: rf(15), letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>
+          {label2}
+        </Text>
+        <View style={{ paddingTop: 4 }}>
+          <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(12), lineHeight: rf(20), color: '#1F2225' }}>
+            {value2}
+          </Text>
+        </View>
+      </View>
+    </View>
   );
 }

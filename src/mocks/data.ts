@@ -380,53 +380,82 @@ const gearItems: GearItem[] = [
   },
 ];
 
+// ── High-quality gear photos from Unsplash ────────────────────────────
+// Using direct Unsplash URLs with reliable photo IDs for outdoor equipment.
+const U = 'https://images.unsplash.com/photo-';
+const P = '?w=800&h=800&fit=crop&auto=format';
+
+function gearImage(listingId: string, id: string, photoId: string, sortOrder = 0, type: 'primary' | 'gallery' = 'primary'): ListingImage {
+  return {
+    id,
+    listingId,
+    storagePath: `${U}${photoId}${P}`,
+    sortOrder,
+    imageType: type,
+    createdAt: now,
+  };
+}
+
 // ============================================================================
-// LISTING IMAGES
+// LISTING IMAGES — Real gear photos
 // ============================================================================
 const listingImages: Record<string, ListingImage[]> = {
-  'listing-1': [
-    {
-      id: 'img-1',
-      listingId: 'listing-1',
-      storagePath: 'mock/listing-1-primary.jpg',
-      sortOrder: 0,
-      imageType: 'primary',
-      createdAt: now,
-    },
-    {
-      id: 'img-2',
-      listingId: 'listing-1',
-      storagePath: 'mock/listing-1-interior.jpg',
-      sortOrder: 1,
-      imageType: 'gallery',
-      createdAt: now,
-    },
-    {
-      id: 'img-3',
-      listingId: 'listing-1',
-      storagePath: 'mock/listing-1-packed.jpg',
-      sortOrder: 2,
-      imageType: 'gallery',
-      createdAt: now,
-    },
+  'listing-1': [ // Big Agnes Copper Spur tent
+    gearImage('listing-1', 'img-1', '1478131143081-80f7f84ca84d', 0, 'primary'),
+    gearImage('listing-1', 'img-2', '1504280390367-361c6d9f38f4', 1, 'gallery'),
+    gearImage('listing-1', 'img-3', '1551632811-561732d1e306', 2, 'gallery'),
   ],
-  'listing-6': [
-    {
-      id: 'img-4',
-      listingId: 'listing-6',
-      storagePath: 'mock/listing-6-primary.jpg',
-      sortOrder: 0,
-      imageType: 'primary',
-      createdAt: now,
-    },
-    {
-      id: 'img-5',
-      listingId: 'listing-6',
-      storagePath: 'mock/listing-6-setup.jpg',
-      sortOrder: 1,
-      imageType: 'gallery',
-      createdAt: now,
-    },
+  'listing-2': [ // Black Diamond Camalot climbing cams
+    gearImage('listing-2', 'img-4', '1522163182402-834f871fd851', 0, 'primary'),
+    gearImage('listing-2', 'img-5', '1518409939535-160b4e65b262', 1, 'gallery'),
+  ],
+  'listing-3': [ // Osprey Atmos backpack
+    gearImage('listing-3', 'img-6', '1551632811-561732d1e306', 0, 'primary'),
+    gearImage('listing-3', 'img-7', '1507003212554-3e0e9ae1f18e', 1, 'gallery'),
+  ],
+  'listing-4': [ // Rossignol skis
+    gearImage('listing-4', 'img-8', '1551698618-1dfe5d97d256', 0, 'primary'),
+    gearImage('listing-4', 'img-9', '1536098561742-ca998e48cbcc', 1, 'gallery'),
+  ],
+  'listing-5': [ // Dagger kayak
+    gearImage('listing-5', 'img-10', '1464564235832-2f8590d6e2ca', 0, 'primary'),
+    gearImage('listing-5', 'img-11', '1473172709813-4c42ee6f5b31', 1, 'gallery'),
+  ],
+  'listing-6': [ // MSR Hubba Hubba tent
+    gearImage('listing-6', 'img-12', '1504280390367-361c6d9f38f4', 0, 'primary'),
+    gearImage('listing-6', 'img-13', '1478131143081-80f7f84ca84d', 1, 'gallery'),
+  ],
+  'listing-7': [ // Trek Domane road bike
+    gearImage('listing-7', 'img-14', '1485965120184-e220f721d03e', 0, 'primary'),
+    gearImage('listing-7', 'img-15', '1532298229545-e1a6b1f35734', 1, 'gallery'),
+  ],
+  'listing-8': [ // Petzl climbing package
+    gearImage('listing-8', 'img-16', '1518409939535-160b4e65b262', 0, 'primary'),
+    gearImage('listing-8', 'img-17', '1522163182402-834f871fd851', 1, 'gallery'),
+  ],
+  'listing-9': [ // Santa Cruz mountain bike
+    gearImage('listing-9', 'img-18', '1576435771390-0a119c4a0e6d', 0, 'primary'),
+    gearImage('listing-9', 'img-19', '1532298229545-e1a6b1f35734', 1, 'gallery'),
+  ],
+  'listing-10': [ // Garmin inReach
+    gearImage('listing-10', 'img-20', '1507003212554-3e0e9ae1f18e', 0, 'primary'),
+    gearImage('listing-10', 'img-21', '1551632811-561732d1e306', 1, 'gallery'),
+  ],
+  'listing-11': [ // Snow Peak cookset
+    gearImage('listing-11', 'img-22', '1478720568472-3057a4f2ae47', 0, 'primary'),
+    gearImage('listing-11', 'img-23', '1510312302820-b446d4ea92d9', 1, 'gallery'),
+  ],
+  'listing-12': [ // Jetboil stove
+    gearImage('listing-12', 'img-24', '1510312302820-b446d4ea92d9', 0, 'primary'),
+    gearImage('listing-12', 'img-25', '1478720568472-3057a4f2ae47', 1, 'gallery'),
+  ],
+  'listing-13': [ // Camping bundle
+    gearImage('listing-13', 'img-26', '1504280390367-361c6d9f38f4', 0, 'primary'),
+    gearImage('listing-13', 'img-27', '1478131143081-80f7f84ca84d', 1, 'gallery'),
+  ],
+  'listing-14': [ // Burton snowboard
+    gearImage('listing-14', 'img-28', '1536098561742-ca998e48cbcc', 0, 'primary'),
+    gearImage('listing-14', 'img-29', '1551698618-1dfe5d97d256', 1, 'gallery'),
   ],
 };
 
@@ -478,7 +507,7 @@ export const mockListings: Listing[] = [
     deletedAt: null,
     gearItem: gearItems[1]!,
     owner: mockProfiles[0]!,
-    images: [],
+    images: listingImages['listing-2'] ?? [],
   },
   {
     id: 'listing-3',
@@ -496,7 +525,7 @@ export const mockListings: Listing[] = [
     deletedAt: null,
     gearItem: gearItems[2]!,
     owner: mockProfiles[0]!,
-    images: [],
+    images: listingImages['listing-3'] ?? [],
   },
   // Sam's listings
   {
@@ -515,7 +544,7 @@ export const mockListings: Listing[] = [
     deletedAt: null,
     gearItem: gearItems[3]!,
     owner: mockProfiles[2]!,
-    images: [],
+    images: listingImages['listing-4'] ?? [],
   },
   {
     id: 'listing-5',
@@ -537,7 +566,7 @@ export const mockListings: Listing[] = [
     deletedAt: null,
     gearItem: gearItems[4]!,
     owner: mockProfiles[2]!,
-    images: [],
+    images: listingImages['listing-5'] ?? [],
   },
   // Morgan's listings
   {
@@ -579,7 +608,7 @@ export const mockListings: Listing[] = [
     deletedAt: null,
     gearItem: gearItems[6]!,
     owner: mockProfiles[3]!,
-    images: [],
+    images: listingImages['listing-7'] ?? [],
   },
   {
     id: 'listing-8',
@@ -602,7 +631,7 @@ export const mockListings: Listing[] = [
     deletedAt: null,
     gearItem: gearItems[7]!,
     owner: mockProfiles[3]!,
-    images: [],
+    images: listingImages['listing-8'] ?? [],
   },
   // Taylor's listings
   {
@@ -626,7 +655,7 @@ export const mockListings: Listing[] = [
     deletedAt: null,
     gearItem: gearItems[8]!,
     owner: mockProfiles[4]!,
-    images: [],
+    images: listingImages['listing-9'] ?? [],
   },
   {
     id: 'listing-10',
@@ -644,7 +673,7 @@ export const mockListings: Listing[] = [
     deletedAt: null,
     gearItem: gearItems[9]!,
     owner: mockProfiles[4]!,
-    images: [],
+    images: listingImages['listing-10'] ?? [],
   },
   // Extra items
   {
@@ -663,7 +692,7 @@ export const mockListings: Listing[] = [
     deletedAt: null,
     gearItem: gearItems[10]!,
     owner: mockProfiles[0]!,
-    images: [],
+    images: listingImages['listing-11'] ?? [],
   },
   {
     id: 'listing-12',
@@ -681,7 +710,7 @@ export const mockListings: Listing[] = [
     deletedAt: null,
     gearItem: gearItems[11]!,
     owner: mockProfiles[3]!,
-    images: [],
+    images: listingImages['listing-12'] ?? [],
   },
   // Bundle
   {
@@ -704,7 +733,7 @@ export const mockListings: Listing[] = [
     deletedAt: null,
     gearItem: gearItems[12]!,
     owner: mockProfiles[0]!,
-    images: [],
+    images: listingImages['listing-14'] ?? [],
   },
   // Unavailable for testing
   {
@@ -723,7 +752,7 @@ export const mockListings: Listing[] = [
     deletedAt: null,
     gearItem: gearItems[13]!,
     owner: mockProfiles[2]!,
-    images: [],
+    images: listingImages['listing-14'] ?? [],
   },
 ];
 

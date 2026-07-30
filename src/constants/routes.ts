@@ -32,8 +32,8 @@ export const ROUTES = {
 export const TAB_ICONS = {
   discover: 'compass-outline' as const,
   discoverFocused: 'compass' as const,
-  rentals: 'calendar-outline' as const,
-  rentalsFocused: 'calendar' as const,
+  rentals: 'briefcase-outline' as const,
+  rentalsFocused: 'briefcase' as const,
   inbox: 'chatbubble-outline' as const,
   inboxFocused: 'chatbubble' as const,
   account: 'person-outline' as const,

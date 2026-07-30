@@ -13,24 +13,55 @@ export function ListingCardSkeleton({ testID }: ListingCardSkeletonProps) {
   return (
     <View
       style={{
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        padding: spacing.md,      // Figma: 12px
+        gap: 16,
         backgroundColor: colors.surfaceElevated,
         borderRadius: radius.card,
         borderWidth: 1,
         borderColor: colors.border,
-        overflow: 'hidden',
       }}
       testID={testID}
       accessibilityLabel="Loading listing"
     >
-      {/* Image skeleton */}
+      {/* Image skeleton (112×112) */}
       <View
         style={{
-          height: 200,
+          width: 112,
+          height: 112,
+          borderRadius: radius.image,
           backgroundColor: colors.graphite700,
         }}
       />
       {/* Content skeleton */}
-      <View style={{ padding: spacing.lg, gap: spacing.sm }}>
+      <View
+        style={{
+          flex: 1,
+          height: 112,
+          justifyContent: 'space-between',
+          paddingVertical: 0,
+          gap: 4,
+        }}
+      >
+        {/* Title */}
+        <View
+          style={{
+            width: '80%',
+            height: 14,
+            borderRadius: radius.chip,
+            backgroundColor: colors.graphite700,
+          }}
+        />
+        <View
+          style={{
+            width: '50%',
+            height: 14,
+            borderRadius: radius.chip,
+            backgroundColor: colors.graphite700,
+          }}
+        />
+        {/* Rating */}
         <View
           style={{
             width: '40%',
@@ -39,26 +70,11 @@ export function ListingCardSkeleton({ testID }: ListingCardSkeletonProps) {
             backgroundColor: colors.graphite700,
           }}
         />
+        {/* Price */}
         <View
           style={{
-            width: '70%',
+            width: '35%',
             height: 18,
-            borderRadius: radius.chip,
-            backgroundColor: colors.graphite700,
-          }}
-        />
-        <View
-          style={{
-            width: '50%',
-            height: 12,
-            borderRadius: radius.chip,
-            backgroundColor: colors.graphite700,
-          }}
-        />
-        <View
-          style={{
-            width: '30%',
-            height: 16,
             borderRadius: radius.chip,
             backgroundColor: colors.graphite700,
           }}

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { View, ScrollView } from 'react-native';
+import { View, ScrollView, Text } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
+import { fontFamilies } from '../../theme/typography';
 import { spacing, radius } from '../../theme/spacing';
+import { rf } from '../../theme/responsiveFont';
 import { AppText } from './AppText';
 import { AppButton } from './AppButton';
 import { Chip } from './Chip';
@@ -47,10 +49,143 @@ export const FilterSheet = React.forwardRef<BottomSheetRef, FilterSheetProps>(fu
     { label: 'Recently Added', value: 'recently_added' },
   ];
 
+  // Build active filter chips for display
+  const activeChips: { label: string; onRemove: () => void }[] = [];
+
+  // Sort label
+  const sortLabel =
+    draft.sort === 'recommended'
+      ? 'Recommended'
+      : draft.sort === 'lowest_price'
+        ? 'Price: Low-High'
+        : draft.sort === 'highest_rated'
+          ? 'Highest Rated'
+          : draft.sort === 'most_rented'
+            ? 'Most Rented'
+            : draft.sort === 'recently_added'
+              ? 'Recently Added'
+              : 'Recommended';
+  if (draft.sort !== 'recommended') {
+    activeChips.push({ label: sortLabel, onRemove: () => setDraft((prev) => ({ ...prev, sort: 'recommended' })) });
+  }
+
+  if (draft.minPrice !== undefined) {
+    activeChips.push({
+      label: `Min $${draft.minPrice / 100}`,
+      onRemove: () => setDraft((prev) => ({ ...prev, minPrice: undefined })),
+    });
+  }
+  if (draft.maxPrice !== undefined) {
+    activeChips.push({
+      label: `Max $${draft.maxPrice / 100}`,
+      onRemove: () => setDraft((prev) => ({ ...prev, maxPrice: undefined })),
+    });
+  }
+  if (draft.maxDeposit !== undefined) {
+    activeChips.push({
+      label: `Deposit ≤$${draft.maxDeposit / 100}`,
+      onRemove: () => setDraft((prev) => ({ ...prev, maxDeposit: undefined })),
+    });
+  }
+  if (draft.verifiedOwnersOnly) {
+    activeChips.push({
+      label: 'Verified Only',
+      onRemove: () => setDraft((prev) => ({ ...prev, verifiedOwnersOnly: false })),
+    });
+  }
+  if (draft.minRating !== undefined) {
+    activeChips.push({
+      label: `${draft.minRating}+ Rating`,
+      onRemove: () => setDraft((prev) => ({ ...prev, minRating: undefined })),
+    });
+  }
+  draft.conditions.forEach((c) => {
+    activeChips.push({
+      label: c.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+      onRemove: () =>
+        setDraft((prev) => ({
+          ...prev,
+          conditions: prev.conditions.filter((cond) => cond !== c),
+        })),
+    });
+  });
+
   return (
     <BottomSheet ref={ref} testID={testID}>
-      <ScrollView style={{ maxHeight: '90%' }} contentContainerStyle={{ gap: spacing.xl }}>
-        <AppText variant="titleMedium">Filters</AppText>
+      <ScrollView
+        style={{ maxHeight: '80%' }}
+        contentContainerStyle={{ paddingBottom: spacing.xl, gap: spacing.xl }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <AppText variant="titleMedium">Filters</AppText>
+          {activeChips.length > 0 && (
+            <AppButton
+              title="Clear All"
+              onPress={() =>
+                setDraft({
+                  minPrice: undefined,
+                  maxPrice: undefined,
+                  maxDeposit: undefined,
+                  verifiedOwnersOnly: false,
+                  minRating: undefined,
+                  conditions: [],
+                  sort: 'recommended',
+                })
+              }
+              variant="ghost"
+              size="sm"
+            />
+          )}
+        </View>
+
+        {/* Active filter chips */}
+        {activeChips.length > 0 && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+            {activeChips.map((chip, i) => (
+              <View
+                key={`chip-${i}`}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingHorizontal: 12,
+                  height: 32,
+                  backgroundColor: colors.signalLime,
+                  borderRadius: 9999,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: fontFamilies.spaceGrotesk.bold,
+                    fontSize: rf(10),
+                    lineHeight: rf(15),
+                    letterSpacing: 1,
+                    textTransform: 'uppercase',
+                    color: colors.carbon950,
+                  }}
+                >
+                  {chip.label}
+                </Text>
+                <Text
+                  onPress={chip.onRemove}
+                  style={{
+                    fontFamily: fontFamilies.inter.bold,
+                    fontSize: rf(12),
+                    lineHeight: rf(15),
+                    color: colors.carbon950,
+                    marginLeft: 2,
+                  }}
+                >
+                  ✕
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {activeChips.length > 0 && <Divider />}
 
         {/* Sort */}
         <View style={{ gap: spacing.md }}>

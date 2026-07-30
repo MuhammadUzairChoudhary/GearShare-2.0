@@ -13,6 +13,48 @@ type AuthCallback = (state: AuthState) => void;
 let authListeners: AuthCallback[] = [];
 let currentState: AuthState = { user: null, session: null, isLoading: true };
 
+// ---------------------------------------------------------------------------
+// Mock user & session used when mock-data mode is active
+// ---------------------------------------------------------------------------
+const mockUserId = 'user-1';
+const mockUserEmail = 'alex@gmx.ch';
+
+const mockUser: User = {
+  id: mockUserId,
+  aud: 'authenticated',
+  role: 'authenticated',
+  email: mockUserEmail,
+  email_confirmed_at: new Date().toISOString(),
+  phone: '',
+  confirmed_at: new Date().toISOString(),
+  last_sign_in_at: new Date().toISOString(),
+  app_metadata: { provider: 'email' },
+  user_metadata: { full_name: 'Alex Morgan' },
+  identities: [],
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  is_anonymous: false,
+};
+
+const mockSession: Session = {
+  access_token: 'mock-access-token',
+  refresh_token: 'mock-refresh-token',
+  expires_in: 3600,
+  expires_at: Math.floor(Date.now() / 1000) + 3600,
+  token_type: 'bearer',
+  user: mockUser,
+};
+
+function setMockSignedIn() {
+  currentState = { user: mockUser, session: mockSession, isLoading: false };
+  notifyListeners();
+}
+
+function setMockSignedOut() {
+  currentState = { user: null, session: null, isLoading: false };
+  notifyListeners();
+}
+
 function notifyListeners() {
   authListeners.forEach((cb) => cb(currentState));
 }
@@ -31,8 +73,7 @@ export function getCurrentAuthState(): AuthState {
 
 export async function initializeAuth(): Promise<AuthState> {
   if (isMockDataEnabled()) {
-    currentState = { user: null, session: null, isLoading: false };
-    notifyListeners();
+    setMockSignedIn();
     return currentState;
   }
 
@@ -68,16 +109,17 @@ export async function initializeAuth(): Promise<AuthState> {
 }
 
 export async function signInWithEmail(
-  email: string,
-  password: string,
+  _email: string,
+  _password: string,
 ): Promise<{ error?: string }> {
   if (isMockDataEnabled()) {
-    return { error: 'Mock mode active. No real authentication available.' };
+    setMockSignedIn();
+    return {};
   }
 
   try {
     const supabase = getSupabaseClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email: _email, password: _password });
 
     if (error) {
       return { error: error.message };
@@ -90,21 +132,22 @@ export async function signInWithEmail(
 }
 
 export async function signUpWithEmail(
-  email: string,
-  password: string,
-  fullName: string,
+  _email: string,
+  _password: string,
+  _fullName: string,
 ): Promise<{ error?: string }> {
   if (isMockDataEnabled()) {
-    return { error: 'Mock mode active. No real authentication available.' };
+    setMockSignedIn();
+    return {};
   }
 
   try {
     const supabase = getSupabaseClient();
     const { error } = await supabase.auth.signUp({
-      email,
-      password,
+      email: _email,
+      password: _password,
       options: {
-        data: { full_name: fullName },
+        data: { full_name: _fullName },
       },
     });
 
@@ -120,8 +163,7 @@ export async function signUpWithEmail(
 
 export async function signOut(): Promise<{ error?: string }> {
   if (isMockDataEnabled()) {
-    currentState = { user: null, session: null, isLoading: false };
-    notifyListeners();
+    setMockSignedOut();
     return {};
   }
 
