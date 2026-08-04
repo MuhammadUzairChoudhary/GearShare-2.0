@@ -48,7 +48,7 @@ jest.mock('react-native', () => {
     accessibilityLabel,
     ...props
   }: any) => {
-    const finalProps: Record<string, any> = { style, testID, ...props };
+    const finalProps: Record<string, any> = { style, testID, accessible: true, ...props };
     if (accessibilityLabel != null) {
       finalProps['aria-label'] = accessibilityLabel;
     }
@@ -73,8 +73,10 @@ jest.mock('react-native', () => {
   };
 
   // Other touchable/pressable components
+  // Note: accessible:true mirrors real RN behaviour (touchables are accessibility
+  // elements), which RNTL's getByRole requires on non-Text host elements.
   const Pressable = ({ children, onPress, style, testID, ...props }: any) =>
-    React.createElement('Pressable', { style, testID, onPress, ...props }, children);
+    React.createElement('Pressable', { style, testID, onPress, accessible: true, ...props }, children);
 
   const TouchableHighlight = ({
     children,
@@ -84,6 +86,10 @@ jest.mock('react-native', () => {
     ...props
   }: any) =>
     React.createElement('TouchableHighlight', { style, testID, onPress, ...props }, children);
+
+  // TouchableWithoutFeedback: renders children with passthrough props (backdrop presses).
+  const TouchableWithoutFeedback = ({ children, ...props }: any) =>
+    React.createElement('TouchableWithoutFeedback', props, children);
 
   const Switch = ({ value, onValueChange, ...props }: any) =>
     React.createElement('Switch', { value, onChange: onValueChange, ...props });
@@ -119,15 +125,25 @@ jest.mock('react-native', () => {
   const useWindowDimensions = jest.fn(() => ({ width: 390, height: 844, scale: 1, fontScale: 1 }));
 
   // Animated
+  // Value is functional so setValue/interpolate resolve; timing invokes its
+  // completion callback so state changes driven by animation callbacks (toast
+  // dismiss) behave like the real thing in tests.
   const Animated = {
     View,
     Text,
     Image,
     ScrollView,
     createAnimatedComponent: (component: any) => component,
-    timing: () => ({ start: jest.fn() }),
+    timing: () => ({
+      start: (callback?: () => void) => {
+        if (typeof callback === 'function') callback();
+      },
+    }),
     spring: () => ({ start: jest.fn() }),
-    Value: jest.fn(),
+    Value: jest.fn(() => ({
+      setValue: jest.fn(),
+      interpolate: jest.fn(() => 0),
+    })),
     event: jest.fn(),
     sequence: jest.fn(),
     parallel: jest.fn(),
@@ -151,10 +167,30 @@ jest.mock('react-native', () => {
   };
 
   const Alert = { alert: jest.fn() };
+  // Easing: bezier returns an easing function; calls must never throw in tests.
+  const Easing = {
+    bezier: jest.fn(() => jest.fn((t: number) => t)),
+    linear: jest.fn((t: number) => t),
+    ease: jest.fn((t: number) => t),
+    in: jest.fn(() => jest.fn((t: number) => t)),
+    out: jest.fn(() => jest.fn((t: number) => t)),
+    inOut: jest.fn(() => jest.fn((t: number) => t)),
+  };
+
   const RefreshControl = (props: any) => React.createElement('RefreshControl', props);
   const Appearance = {
     getColorScheme: jest.fn(() => 'dark'),
     addChangeListener: jest.fn(() => ({ remove: jest.fn() })),
+  };
+  const AccessibilityInfo = {
+    isReduceMotionEnabled: jest.fn(() => Promise.resolve(false)),
+    isBoldTextEnabled: jest.fn(() => Promise.resolve(false)),
+    isScreenReaderEnabled: jest.fn(() => Promise.resolve(false)),
+    announceForAccessibility: jest.fn(),
+    setAccessibilityFocus: jest.fn(),
+    addEventListener: jest.fn((_eventName: string, _handler: (...args: any[]) => void) => ({
+      remove: jest.fn(),
+    })),
   };
 
   return {
@@ -171,6 +207,7 @@ jest.mock('react-native', () => {
     KeyboardAvoidingView,
     Modal,
     Pressable,
+    TouchableWithoutFeedback,
     Switch,
     StatusBar,
     StyleSheet,
@@ -183,6 +220,8 @@ jest.mock('react-native', () => {
     Linking,
     Alert,
     Appearance,
+    AccessibilityInfo,
+    Easing,
     useColorScheme,
     useWindowDimensions,
   };
@@ -229,6 +268,18 @@ jest.mock('@expo/vector-icons', () => {
     React.createElement('Icon', { name, size, color, testID });
   return { Ionicons: MockIcon, MaterialIcons: MockIcon, Feather: MockIcon };
 });
+
+// ==============================
+// 4b. Expo Haptics Mock
+// ==============================
+
+jest.mock('expo-haptics', () => ({
+  selectionAsync: jest.fn(() => Promise.resolve()),
+  impactAsync: jest.fn(() => Promise.resolve()),
+  notificationAsync: jest.fn(() => Promise.resolve()),
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy', Soft: 'soft', Rigid: 'rigid' },
+  NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
+}));
 
 // ==============================
 // 4. React Native Reanimated Mock

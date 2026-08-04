@@ -20,6 +20,7 @@ export const ROUTES = {
   LISTING: (id: string) => `/listing/${id}` as const,
   RENTAL: (id: string) => `/rental/${id}` as const,
   ISSUE: (id: string) => `/issue/${id}` as const,
+  CHAT: (rentalId: string) => `/chat/${rentalId}` as const,
 
   // Owner routes
   OWNER: {

@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { View, Animated, TouchableOpacity, Text, StatusBar } from 'react-native';
+import { View, Animated, TouchableOpacity, Text, StatusBar, Dimensions } from 'react-native';
 import { Stack, useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppIcon } from '../../components/ui/Icons';
@@ -22,21 +22,23 @@ export default function ListingDetailScreen() {
   const { data: listing, isLoading, isError, refetch } = useListing(listingId ?? '');
   const [isSaved, setIsSaved] = useState(false);
 
+    const IMAGE_HEIGHT = Dimensions.get('window').height * 0.4;
+
   const scrollY = useRef(new Animated.Value(0)).current;
 
   // ── Animated interpolations for collapsible header ──────────────
   const headerBgOpacity = scrollY.interpolate({
-    inputRange: [120, 380],
+    inputRange: [IMAGE_HEIGHT * 0.3, IMAGE_HEIGHT * 0.95],
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
   const collapsedTitleOpacity = scrollY.interpolate({
-    inputRange: [300, 380],
+    inputRange: [IMAGE_HEIGHT * 0.75, IMAGE_HEIGHT * 0.95],
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
   const mainTitleOpacity = scrollY.interpolate({
-    inputRange: [300, 380],
+    inputRange: [IMAGE_HEIGHT * 0.75, IMAGE_HEIGHT * 0.95],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
@@ -188,8 +190,8 @@ export default function ListingDetailScreen() {
         )}
         scrollEventThrottle={16}
       >
-        {/* ── Hero Image — scrolls with content now ───────────────── */}
-        <View style={{ width: '100%', height: 400, backgroundColor: '#DDE1E3' }}>
+        {/* ── Hero Image — 2/5 of screen height ──────────────────── */}
+        <View style={{ width: '100%', height: IMAGE_HEIGHT, backgroundColor: '#DDE1E3' }}>
           {/* Placeholder image */}
           <View style={{ flex: 1, backgroundColor: colors.graphite300, opacity: 0.3 }} />
 

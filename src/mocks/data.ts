@@ -856,6 +856,15 @@ export const mockMessages: Message[] = [
     readAt: now,
     createdAt: daysAgo(10),
   },
+  {
+    id: 'msg-4',
+    rentalId: 'rental-2',
+    senderId: 'user-3',
+    body: "Pickup is confirmed for 9 AM — see you at the climber's lot.",
+    messageType: 'text',
+    readAt: null,
+    createdAt: daysAgo(1),
+  },
 ];
 
 // ============================================================================

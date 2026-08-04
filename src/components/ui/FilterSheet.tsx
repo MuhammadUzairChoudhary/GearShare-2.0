@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, ScrollView, Text } from 'react-native';
+import { View, ScrollView, Text, TouchableOpacity } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { fontFamilies } from '../../theme/typography';
 import { spacing, radius } from '../../theme/spacing';
@@ -135,7 +135,7 @@ export const FilterSheet = React.forwardRef<BottomSheetRef, FilterSheetProps>(fu
                 })
               }
               variant="ghost"
-              size="sm"
+              size="small"
             />
           )}
         </View>
@@ -168,18 +168,24 @@ export const FilterSheet = React.forwardRef<BottomSheetRef, FilterSheetProps>(fu
                 >
                   {chip.label}
                 </Text>
-                <Text
+                <TouchableOpacity
                   onPress={chip.onRemove}
-                  style={{
-                    fontFamily: fontFamilies.inter.bold,
-                    fontSize: rf(12),
-                    lineHeight: rf(15),
-                    color: colors.carbon950,
-                    marginLeft: 2,
-                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove filter ${chip.label}`}
+                  style={{ marginLeft: 2, padding: 2 }}
                 >
-                  ✕
-                </Text>
+                  <Text
+                    style={{
+                      fontFamily: fontFamilies.inter.bold,
+                      fontSize: rf(12),
+                      lineHeight: rf(15),
+                      color: colors.carbon950,
+                    }}
+                  >
+                    ✕
+                  </Text>
+                </TouchableOpacity>
               </View>
             ))}
           </View>
@@ -310,7 +316,7 @@ export const FilterSheet = React.forwardRef<BottomSheetRef, FilterSheetProps>(fu
             onPress={() => onApply(draft)}
             variant="primary"
             fullWidth
-            size="lg"
+            size="large"
           />
           <AppButton
             title="Clear All"

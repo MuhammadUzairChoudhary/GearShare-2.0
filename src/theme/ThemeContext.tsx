@@ -1,12 +1,14 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { themeColors } from './colors';
-import type { ThemeColorScheme } from './colors';
 
 type ColorMode = 'light' | 'dark';
 
+/** Concrete color scheme (light | dark) — keys are typed, so no undefined access. */
+export type ThemeColorScheme = (typeof themeColors)[ColorMode];
+
 interface ThemeContextValue {
   mode: ColorMode;
-  colors: Record<string, string>;
+  colors: ThemeColorScheme;
   isDark: boolean;
   toggleMode: () => void;
   setMode: (mode: ColorMode) => void;

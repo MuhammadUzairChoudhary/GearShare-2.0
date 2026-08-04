@@ -45,7 +45,7 @@ export function EmptyState({
         </AppText>
       )}
       {actionLabel && onAction && (
-        <AppButton title={actionLabel} onPress={onAction} variant="secondary" size="md" />
+        <AppButton title={actionLabel} onPress={onAction} variant="secondary" size="medium" />
       )}
     </View>
   );

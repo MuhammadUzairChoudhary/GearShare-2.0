@@ -12,6 +12,8 @@ import { spacing, radius } from '../../theme/spacing';
 
 interface TextInputProps extends Omit<RNTextInputProps, 'style'> {
   label: string;
+  /** Marks the field as required — renders a red asterisk next to the label. */
+  required?: boolean;
   error?: string;
   hint?: string;
   containerStyle?: ViewStyle;
@@ -20,6 +22,7 @@ interface TextInputProps extends Omit<RNTextInputProps, 'style'> {
 
 export function TextInput({
   label,
+  required = false,
   error,
   hint,
   containerStyle,
@@ -43,6 +46,9 @@ export function TextInput({
         style={[typography.labelMedium, { color: hasError ? colors.error : colors.textSecondary }]}
       >
         {label}
+        {required && (
+          <Text style={{ color: colors.error, fontWeight: '700' }}>{' *'}</Text>
+        )}
       </Text>
       <RNTextInput
         style={[

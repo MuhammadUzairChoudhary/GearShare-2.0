@@ -1,8 +1,9 @@
 import React, { useCallback, useState, useEffect } from 'react';
-import { View, ScrollView, TouchableOpacity, Text, Modal } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Text, Modal, TextInput } from 'react-native';
 import { Stack, useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppIcon } from '../../components/ui/Icons';
+import { AlpineDialog } from '../../components/ui/AlpineDialog';
 import { useTheme } from '../../theme/ThemeContext';
 import { fontFamilies } from '../../theme/typography';
 import { spacing, radius } from '../../theme/spacing';
@@ -66,7 +67,7 @@ function getSubStatusForStep(stepIndex: number, status: RentalStatus): string {
 
 // ── Demo phase flow ──────────────────────────────────────────────────────
 const DEMO_PHASES: RentalStatus[] = ['request_sent', 'pickup_due', 'active', 'completed'];
-const DEMO_CTA_LABELS = ['Cancel Request', 'Confirm Gear Received', 'Start Return', 'Submit Review'];
+const DEMO_CTA_LABELS = ['Cancel Request', 'Scan to confirm pickup', 'Start Return', 'Submit Review'];
 
 // ── Date/preset helpers for demo ──────────────────────────────────────────
 const DAY_MS = 86400000;
@@ -90,66 +91,84 @@ function sameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-function RentalCalendar({ startDate, endDate, onStartChange, onEndChange, disabled }: {
+function RentalCalendar({ startDate, endDate, onSelectDate, onDone, disabled }: {
   startDate: Date;
-  endDate: Date;
-  onStartChange: (d: Date) => void;
-  onEndChange: (d: Date) => void;
+  endDate: Date | null;
+  onSelectDate: (d: Date) => void;
+  onDone: () => void;
   disabled: boolean;
 }) {
   const [viewDate, setViewDate] = useState(new Date(startDate));
-  const [selecting, setSelecting] = useState<'start' | 'end'>('start');
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
   const days = getCalendarDays(year, month);
 
-  const prevMonth = () => setViewDate(new Date(year, month - 1, 1));
-  const nextMonth = () => setViewDate(new Date(year, month + 1, 1));
+  const prevMonth = () => { setViewDate(new Date(year, month - 1, 1)); setShowMonthPicker(false); };
+  const nextMonth = () => { setViewDate(new Date(year, month + 1, 1)); setShowMonthPicker(false); };
 
+  // Tap-to-select range: 1st tap = start, 2nd tap = end. Range state machine
+  // (reset on tap after a complete range) lives in the parent's selectDate.
   const handleDayPress = (day: number) => {
     if (disabled) return;
     const picked = new Date(year, month, day);
     const today = new Date(); today.setHours(0,0,0,0);
     if (picked < today) return;
-
-    if (selecting === 'start') {
-      onStartChange(picked);
-      if (picked >= endDate) {
-        const newEnd = new Date(picked);
-        newEnd.setDate(newEnd.getDate() + 1);
-        onEndChange(newEnd);
-      }
-      setSelecting('end');
-    } else {
-      if (picked <= startDate) {
-        onStartChange(picked);
-        setSelecting('end');
-      } else {
-        onEndChange(picked);
-        setSelecting('start');
-      }
-    }
+    onSelectDate(picked);
   };
 
-  const isInRange = (day: number) => {
-    const d = new Date(year, month, day);
-    return d > startDate && d < endDate;
-  };
+  const today = new Date(); today.setHours(0,0,0,0);
+  const rangeDays = endDate ? Math.round((endDate.getTime() - startDate.getTime()) / DAY_MS) + 1 : 0;
+  const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
   return (
     <View style={{ padding: 10 }}>
+      {/* ── Instructional text ── */}
+      <Text style={{
+        fontFamily: fontFamilies.inter.regular,
+        fontSize: rf(10),
+        lineHeight: rf(14),
+        color: 'rgba(44,48,52,0.5)',
+        textAlign: 'center',
+        marginBottom: 8,
+      }}>
+        {endDate ? 'Tap a date to start a new selection' : 'Tap a date to set your end date'}
+      </Text>
+
       {/* Month header */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <TouchableOpacity onPress={prevMonth} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name="chevron-back" size={16} color="#1F2225" />
         </TouchableOpacity>
-        <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(13), lineHeight: rf(18), color: '#1F2225' }}>
-          {MONTHS[month]} {year}
-        </Text>
+        <TouchableOpacity onPress={() => setShowMonthPicker(!showMonthPicker)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(13), lineHeight: rf(18), color: '#1F2225' }}>
+            {MONTHS[month]} {year}
+          </Text>
+          <Ionicons name={showMonthPicker ? 'chevron-up' : 'chevron-down'} size={12} color="rgba(44,48,52,0.4)" />
+        </TouchableOpacity>
         <TouchableOpacity onPress={nextMonth} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name="chevron-forward" size={16} color="#1F2225" />
         </TouchableOpacity>
       </View>
+
+      {/* Quick month/year scroller */}
+      {showMonthPicker && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 8, padding: 8, backgroundColor: '#F8F9F9', borderRadius: 8 }}>
+          {Array.from({ length: 12 }, (_, m) => {
+            const isCurrent = m === month;
+            return (
+              <TouchableOpacity
+                key={m}
+                onPress={() => { setViewDate(new Date(year, m, 1)); setShowMonthPicker(false); }}
+                style={{ width: `${100/4}%`, paddingVertical: 6, alignItems: 'center', backgroundColor: isCurrent ? '#1F2225' : 'transparent', borderRadius: 4 }}
+              >
+                <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(10), lineHeight: rf(14), color: isCurrent ? '#C8FF3D' : '#1F2225' }}>{MONTHS[m]}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
       {/* Day headers */}
       <View style={{ flexDirection: 'row' }}>
         {DAY_HEADERS.map((h, j) => (
@@ -163,10 +182,10 @@ function RentalCalendar({ startDate, endDate, onStartChange, onEndChange, disabl
         {days.map((day, j) => {
           if (day === null) return <View key={`e-${j}`} style={{ width: `${100/7}%`, aspectRatio: 1 }} />;
           const d = new Date(year, month, day);
-          const today = new Date(); today.setHours(0,0,0,0);
           const isPast = d < today;
-          const isSelected = sameDay(d, startDate) || sameDay(d, endDate);
-          const inRange = isInRange(day);
+          const isStart = sameDay(d, startDate);
+          const isEnd = endDate !== null && sameDay(d, endDate);
+          const inRange = endDate !== null && d > startDate && d < endDate;
 
           return (
             <TouchableOpacity
@@ -178,31 +197,81 @@ function RentalCalendar({ startDate, endDate, onStartChange, onEndChange, disabl
                 aspectRatio: 1,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: isSelected ? '#1F2225' : inRange ? 'rgba(200,255,61,0.3)' : 'transparent',
-                borderRadius: isSelected ? 6 : 0,
+                backgroundColor: isStart || isEnd ? '#1F2225' : inRange ? 'rgba(200,255,61,0.3)' : 'transparent',
+                borderTopLeftRadius: isStart ? 8 : 0,
+                borderBottomLeftRadius: isStart ? 8 : 0,
+                borderTopRightRadius: isEnd ? 8 : 0,
+                borderBottomRightRadius: isEnd ? 8 : 0,
               }}
             >
               <Text style={{
                 fontFamily: fontFamilies.inter.semiBold,
                 fontSize: rf(12),
                 lineHeight: rf(17),
-                color: isSelected ? '#C8FF3D' : isPast ? 'rgba(44,48,52,0.25)' : '#1F2225',
+                color: isStart || isEnd ? '#C8FF3D' : isPast ? 'rgba(44,48,52,0.25)' : '#1F2225',
               }}>{day}</Text>
             </TouchableOpacity>
           );
         })}
       </View>
-      {/* Legend */}
-      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16, marginTop: 8 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <View style={{ width: 10, height: 10, backgroundColor: '#1F2225', borderRadius: 2 }} />
-          <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(8), lineHeight: rf(12), color: 'rgba(44,48,52,0.4)' }}>Selected</Text>
+
+      {/* Summary bar + Done button */}
+      <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#ECEEEF', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.5, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }} numberOfLines={1}>
+            {endDate ? `${fmtShort(startDate)} — ${fmtShort(endDate)}` : fmtShort(startDate)}
+          </Text>
+          <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(9), lineHeight: rf(13), color: 'rgba(44,48,52,0.5)', marginTop: 1 }} numberOfLines={1}>
+            {endDate ? `${rangeDays} day${rangeDays !== 1 ? 's' : ''} selected` : 'Tap again to set your end date'}
+          </Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <View style={{ width: 10, height: 10, backgroundColor: 'rgba(200,255,61,0.3)', borderRadius: 2 }} />
-          <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(8), lineHeight: rf(12), color: 'rgba(44,48,52,0.4)' }}>Range</Text>
-        </View>
+        <TouchableOpacity
+          onPress={onDone}
+          disabled={disabled}
+          style={{ paddingHorizontal: 20, height: 36, backgroundColor: '#1F2225', borderRadius: 6, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.5 : 1 }}
+        >
+          <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(11), lineHeight: rf(16), letterSpacing: 0.5, textTransform: 'uppercase', color: 'white' }}>Apply</Text>
+        </TouchableOpacity>
       </View>
+    </View>
+  );
+}
+
+// ── Pseudo-QR placeholder for the active phase — decorative, no scanning ──
+function ReturnQrCode() {
+  const size = 15;
+  const cell = 9;
+  // Deterministic pseudo-random fill for the data region
+  const cells: boolean[] = [];
+  let seed = 42;
+  for (let i = 0; i < size * size; i++) {
+    seed = (seed * 31 + 17) % 9973;
+    cells.push(seed % 2 === 0);
+  }
+  // Classic QR finder: dark border + dark 3x3 center, light ring between.
+  // Local coordinates are computed per finder origin so the ring stays aligned.
+  const finderOn = (r: number, c: number) => {
+    const lr = r >= size - 7 ? r - (size - 7) : r;
+    const lc = c >= size - 7 ? c - (size - 7) : c;
+    const border = lr === 0 || lr === 6 || lc === 0 || lc === 6;
+    const center = lr >= 2 && lr <= 4 && lc >= 2 && lc <= 4;
+    return border || center;
+  };
+  const inFinder = (r: number, c: number) =>
+    (r < 7 && c < 7) || (r < 7 && c >= size - 7) || (r >= size - 7 && c < 7);
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: size * cell }}>
+      {Array.from({ length: size * size }, (_, idx) => {
+        const r = Math.floor(idx / size);
+        const c = idx % size;
+        const on = inFinder(r, c) ? finderOn(r, c) : cells[idx];
+        return (
+          <View
+            key={idx}
+            style={{ width: cell, height: cell, backgroundColor: on ? '#1F2225' : '#FFFFFF', borderWidth: 0.5, borderColor: '#F0F1F2' }}
+          />
+        );
+      })}
     </View>
   );
 }
@@ -212,12 +281,29 @@ export default function RentalDetailScreen() {
   const { colors } = useTheme();
   const isDemo = demo === 'true';
   const [demoPhase, setDemoPhase] = useState(0);
-  const [demoRentalDays, setDemoRentalDays] = useState(3);
+  // ── Demo rental range: 1st tap = start, 2nd tap = end ──
+  // Seeded with a complete 3-day range so pricing shows immediately; the first
+  // tap in the calendar resets it to a fresh start date.
+  const [rentalRange, setRentalRange] = useState<{ start: Date; end: Date | null }>(() => {
+    // Seeded ~4 days out so pickup is >48h away and cancellation is testable
+    const start = new Date(Date.now() + DAY_MS * 4);
+    start.setHours(0, 0, 0, 0);
+    return { start, end: new Date(start.getTime() + DAY_MS * 2) };
+  });
   const [timelineExpanded, setTimelineExpanded] = useState(true);
   const [showProductModal, setShowProductModal] = useState(false);
+  const [showRentalDetails, setShowRentalDetails] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
-  const demoStatus = DEMO_PHASES[demoPhase] as RentalStatus;
+  const [cancelled, setCancelled] = useState(false);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [showPlansMenu, setShowPlansMenu] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewText, setReviewText] = useState('');
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  // Vertical offset for the options dropdown — measured from the 3-dot button
+  const [optionsAnchorTop, setOptionsAnchorTop] = useState(96);
+  const demoStatus = (cancelled ? 'cancelled' : DEMO_PHASES[demoPhase]) as RentalStatus;
 
   // ── Real rental query OR demo listing query ────────────────
   const {
@@ -235,16 +321,34 @@ export default function RentalDetailScreen() {
   } = useListing(isDemo ? rentalId ?? '' : '');
 
   // ── Derive dynamic dates for demo ──────────────────────────────
-  const demoStartMs = Date.now() + DAY_MS * 2;
-  const demoEndMs = demoStartMs + DAY_MS * demoRentalDays;
+  const demoStartMs = rentalRange.start.getTime();
+  const demoEndMs = rentalRange.end ? rentalRange.end.getTime() : demoStartMs;
+  // Pickup happens one day before the first rental day
+  const demoPickupMs = demoStartMs - DAY_MS;
+  const demoRentalDays = rentalRange.end
+    ? Math.round((rentalRange.end.getTime() - rentalRange.start.getTime()) / DAY_MS) + 1
+    : 1;
   const startDateStr = new Date(demoStartMs).toISOString();
   const endDateStr = new Date(demoEndMs).toISOString();
   const dailyPrice = demoListing?.dailyPrice ?? 32;
   const depositAmount = demoListing?.depositAmount ?? 350;
   const dynamicTotal = dailyPrice * demoRentalDays;
 
-  const adjustDays = useCallback((delta: number) => {
-    setDemoRentalDays(prev => Math.max(1, Math.min(14, prev + delta)));
+  // Tap-to-select range logic: 1st tap = start, 2nd tap = end. After a full
+  // range is set, any new tap resets and becomes the fresh start date.
+  const selectDate = useCallback((d: Date) => {
+    setRentalRange(prev => {
+      if (prev.end !== null) {
+        // Range complete → reset, this tap becomes the new start
+        return { start: d, end: null };
+      }
+      if (d.getTime() < prev.start.getTime()) {
+        // Tapped before the start → treat as a fresh start
+        return { start: d, end: null };
+      }
+      // Tap on/after the start → completes the span (equal = single day)
+      return { start: prev.start, end: d };
+    });
   }, []);
 
   // ── Build the rental object ────────────────────────────────
@@ -257,7 +361,7 @@ export default function RentalDetailScreen() {
           ownerId: 'demo-owner',
           startDate: startDateStr,
           endDate: endDateStr,
-          pickupWindow: new Date(demoStartMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ', 08:00 AM — 10:00 AM',
+          pickupWindow: new Date(demoPickupMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ', 08:00 AM — 10:00 AM',
           returnWindow: null,
           intendedUse: null,
           rentalCharge: dynamicTotal,
@@ -294,7 +398,18 @@ export default function RentalDetailScreen() {
   }, [isDemo]);
 
   const handleMessageOwner = useCallback(() => {
-    router.push(ROUTES.TABS.INBOX);
+    router.push(ROUTES.CHAT(rentalId ?? ''));
+  }, [rentalId]);
+
+  const handleCancelRental = useCallback(() => {
+    setShowOptionsMenu(false);
+    setShowCancelDialog(true);
+  }, []);
+
+  const confirmCancelRental = useCallback(() => {
+    setShowCancelDialog(false);
+    setCancelled(true);
+    setRequestSent(false);
   }, []);
 
   // ── Loading state ─────────────────────────────────────────────────
@@ -343,9 +458,27 @@ export default function RentalDetailScreen() {
   const rentalStatus = isDemo ? demoStatus : rental.status;
   const activeStep = getActiveStep(rentalStatus);
   const isCancelled = rentalStatus === 'cancelled';
-  const daysDiff = Math.ceil(
-    (new Date(rental.endDate).getTime() - new Date(rental.startDate).getTime()) / 86400000,
-  );
+  const daysDiff = isDemo
+    ? demoRentalDays
+    : Math.ceil(
+        (new Date(rental.endDate).getTime() - new Date(rental.startDate).getTime()) / 86400000,
+      );
+
+  // ── Cancellation eligibility: free cancellation until 48h before pickup ──
+  const pickupMs = isDemo
+    ? demoPickupMs
+    : new Date(rental.pickupWindow?.split(' — ')[0] ?? rental.startDate).getTime();
+  const cancelDeadlineMs = pickupMs - 48 * 60 * 60 * 1000;
+  const canCancelRental = !isCancelled && Date.now() < cancelDeadlineMs;
+
+  // ── Request extension eligibility: only when more than 48h remain to return ──
+  const returnMs = new Date(rental.endDate).getTime();
+  const canRequestExtension = Date.now() < returnMs - 48 * 60 * 60 * 1000;
+  // Rental details available once the request is submitted, throughout all steps.
+  // Real (non-demo) rentals are only viewable here once submitted, so always show.
+  const rentalStarted = !isDemo || requestSent || activeStep >= 1 || isCancelled;
+  // Cancel available after submission until pickup, with the 48h-before-pickup rule
+  const canShowCancelOption = rentalStarted && canCancelRental && activeStep <= 1;
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -367,8 +500,23 @@ export default function RentalDetailScreen() {
             Rental Detail
           </Text>
 
-          {/* Spacer to keep title centered (same width as back button for balance) */}
-          <View style={{ width: 40 }} />
+          {/* Options menu — ⋮ opens the dropdown when Cancel Rental is available; otherwise the info icon jumps straight to rental details; hidden before the request is submitted */}
+          {rentalStarted ? (
+            <TouchableOpacity
+              onPress={() => (canShowCancelOption ? setShowOptionsMenu(true) : setShowRentalDetails(true))}
+              onLayout={(e) => setOptionsAnchorTop(e.nativeEvent.layout.y + e.nativeEvent.layout.height + 8)}
+              style={{ width: 40, height: 40, backgroundColor: colors.white, borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}
+              accessibilityLabel={canShowCancelOption ? 'Rental options' : 'Rental details'}
+            >
+              {canShowCancelOption ? (
+                <Ionicons name="ellipsis-horizontal" size={16} color="#1F2225" />
+              ) : (
+                <AppIcon name="info" size={14} color="#1F2225" />
+              )}
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 40, height: 40 }} />
+          )}
         </View>
       </View>
 
@@ -378,29 +526,22 @@ export default function RentalDetailScreen() {
         contentContainerStyle={{ paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ════════════════════════════════════════════════════════════ */}
-        {/* ── PRODUCT BANNER — single card shown above all phases ── */}
-        {/* ════════════════════════════════════════════════════════════ */}
-        <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.xxxl }}>
-          <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 12, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-            <View style={{ width: 48, height: 48, backgroundColor: '#ECEEEF', borderRadius: 6 }}>
-              <View style={{ flex: 1, backgroundColor: colors.graphite300, opacity: 0.2 }} />
+        {/* ── Cancelled banner — shown once the rental is cancelled ── */}
+        {isCancelled && (
+          <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg }}>
+            <View style={{ padding: spacing.lg, backgroundColor: '#1F2225', borderRadius: 10, flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+              <View style={{ width: 40, height: 40, borderRadius: 9999, backgroundColor: 'rgba(200,255,61,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="close" size={18} color={colors.signalLime} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(15), lineHeight: rf(20), color: colors.white }}>Rental Cancelled</Text>
+                <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(11), lineHeight: rf(16), color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+                  No charge applied. Your deposit hold has been released.
+                </Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(14), lineHeight: rf(18), textTransform: 'uppercase', color: '#1F2225' }} numberOfLines={1}>
-                {gear?.name ?? 'Black Diamond Camalot C4 Set'}
-              </Text>
-              <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.6)', marginTop: 2 }}>{owner?.fullName ?? 'Marc Giroud'}</Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => setShowProductModal(true)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 32, backgroundColor: '#1F2225', borderRadius: 6 }}
-            >
-              <Ionicons name="eye-outline" size={14} color="white" />
-              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(9), lineHeight: rf(14), letterSpacing: 0.9, textTransform: 'uppercase', color: 'white' }}>View</Text>
-            </TouchableOpacity>
           </View>
-        </View>
+        )}
 
         {/* ════════════════════════════════════════════════════════════ */}
         {/* ── VERTICAL TIMELINE — all 4 phases with icons and collapsible content ── */}
@@ -415,20 +556,20 @@ export default function RentalDetailScreen() {
 
             return (
               <View key={step.key} style={{ flexDirection: 'row', minHeight: isActive ? undefined : 64 }}>
-                {/* ── Timeline column (icon + connecting line) ── */}
+                {/* ── Timeline column (icon + connecting line) — completed steps are muted so the current phase stands out ── */}
                 <View style={{ alignItems: 'center', width: 40 }}>
                   <View style={{
                     width: 32,
                     height: 32,
                     borderRadius: 16,
-                    backgroundColor: isActive || isPast ? colors.signalLime : '#ECEEEF',
+                    backgroundColor: isActive ? colors.signalLime : isPast ? 'rgba(200,255,61,0.35)' : '#ECEEEF',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}>
                     <Ionicons
                       name={iconName}
                       size={16}
-                      color={isActive || isPast ? '#1F2225' : 'rgba(74,78,84,0.4)'}
+                      color={isActive ? '#1F2225' : isPast ? 'rgba(31,34,37,0.5)' : 'rgba(74,78,84,0.4)'}
                     />
                   </View>
                   {!isLast && (
@@ -436,7 +577,7 @@ export default function RentalDetailScreen() {
                       width: 2,
                       flex: 1,
                       minHeight: 32,
-                      backgroundColor: isPast ? colors.signalLime : '#ECEEEF',
+                      backgroundColor: isPast ? 'rgba(200,255,61,0.35)' : '#ECEEEF',
                     }} />
                   )}
                 </View>
@@ -456,7 +597,7 @@ export default function RentalDetailScreen() {
                         lineHeight: rf(20),
                         letterSpacing: -0.3,
                         textTransform: 'uppercase',
-                        color: isActive || isPast ? '#1F2225' : 'rgba(74,78,84,0.4)',
+                        color: isActive ? '#1F2225' : isPast ? 'rgba(74,78,84,0.5)' : 'rgba(74,78,84,0.4)',
                       }}>
                         {step.label}
                       </Text>
@@ -481,36 +622,51 @@ export default function RentalDetailScreen() {
 
                   {/* ── Persistent CTA — only visible on the active phase ── */}
                   {isActive && (
-                    <TouchableOpacity
-                      activeOpacity={0.85}
-                      onPress={i === 0 ? (requestSent ? () => setRequestSent(false) : () => setRequestSent(true)) : handleAdvancePhase}
-                      style={{
-                        flexDirection: 'row',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        gap: 6,
-                        marginTop: 12,
-                        height: 44,
-                        backgroundColor: i === 0 && !requestSent ? '#1F2225' : colors.signalLime,
-                        borderRadius: 8,
-                      }}
-                    >
-                      <Text style={{
-                        fontFamily: fontFamilies.spaceGrotesk.bold,
-                        fontSize: rf(11),
-                        lineHeight: rf(16),
-                        letterSpacing: 1,
-                        textTransform: 'uppercase',
-                        color: i === 0 && !requestSent ? 'white' : '#1F2225',
-                      }}>
-                        {i === 0 ? (requestSent ? 'Cancel Request' : 'Request Rental') : DEMO_CTA_LABELS[i]}
-                      </Text>
-                      {i === 0 && !requestSent ? (
-                        <Ionicons name="send" size={10} color="white" />
-                      ) : (
-                        <Ionicons name="arrow-forward" size={10} color="#1F2225" />
+                    <>
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={i === 0 ? (requestSent ? () => setRequestSent(false) : () => setRequestSent(true)) : handleAdvancePhase}
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          gap: 6,
+                          marginTop: 12,
+                          height: 44,
+                          backgroundColor: i === 0 && !requestSent ? '#1F2225' : i === 0 && requestSent ? '#EF4444' : colors.signalLime,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <Text style={{
+                          fontFamily: fontFamilies.spaceGrotesk.bold,
+                          fontSize: rf(11),
+                          lineHeight: rf(16),
+                          letterSpacing: 1,
+                          textTransform: 'uppercase',
+                          color: i === 0 ? 'white' : '#1F2225',
+                        }}>
+                          {i === 0 ? (requestSent ? 'Cancel Request' : 'Request Rental') : DEMO_CTA_LABELS[i]}
+                        </Text>
+                        {i === 0 ? (
+                          requestSent ? (
+                            <Ionicons name="close" size={12} color="white" />
+                          ) : (
+                            <Ionicons name="send" size={10} color="white" />
+                          )
+                        ) : (
+                          <AppIcon name="chevron-right" size={10} color="#1F2225" />
+                        )}
+                      </TouchableOpacity>
+                      {/* Auto-approving status — under the Cancel Request button */}
+                      {i === 0 && requestSent && (
+                        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5, marginTop: 8 }}>
+                          <Ionicons name="checkmark-circle" size={11} color={colors.signalLime} />
+                          <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(9), lineHeight: rf(13), color: 'rgba(44,48,52,0.5)' }}>
+                            Auto-approving after 5s (demo)
+                          </Text>
+                        </View>
                       )}
-                    </TouchableOpacity>
+                    </>
                   )}
 
                   {/* ── Expanded content (only for active step, collapsible on tap) ── */}
@@ -543,83 +699,92 @@ export default function RentalDetailScreen() {
                             >
                               <View
                                 onStartShouldSetResponder={() => true}
-                                style={{ width: '100%', maxWidth: 340, backgroundColor: colors.white, borderRadius: 12, padding: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24 }}
+                                style={{ width: '100%', maxWidth: 340, backgroundColor: colors.white, borderRadius: radius.card, padding: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24 }}
                               >
                                 <RentalCalendar
-                                  startDate={new Date(demoStartMs)}
-                                  endDate={new Date(demoEndMs)}
-                                  onStartChange={(d: Date) => {
-                                    const diff = Math.round((demoEndMs - d.getTime()) / DAY_MS);
-                                    setDemoRentalDays(Math.max(1, Math.min(14, diff)));
-                                    setShowCalendar(false);
-                                  }}
-                                  onEndChange={(d: Date) => {
-                                    const diff = Math.round((d.getTime() - demoStartMs) / DAY_MS);
-                                    setDemoRentalDays(Math.max(1, Math.min(14, diff)));
-                                    setShowCalendar(false);
-                                  }}
+                                  startDate={rentalRange.start}
+                                  endDate={rentalRange.end}
+                                  onSelectDate={selectDate}
+                                  onDone={() => setShowCalendar(false)}
                                   disabled={requestSent}
                                 />
                               </View>
                             </TouchableOpacity>
                           </Modal>
 
-                          {/* ── Dates field — tappable row with calendar icon ── */}
+                          {/* ── Dates field — text left-aligned, calendar icon (same as cancellation policy) on the right ── */}
                           <TouchableOpacity
                             disabled={requestSent}
                             onPress={() => setShowCalendar(!showCalendar)}
                             activeOpacity={0.7}
                             style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 12, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', gap: 12 }}
                           >
-                            <Ionicons name="calendar-outline" size={18} color={requestSent ? 'rgba(44,48,52,0.3)' : '#1F2225'} />
                             <View style={{ flex: 1 }}>
                               <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>DATES</Text>
-                              <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(13), lineHeight: rf(18), color: requestSent ? 'rgba(44,48,52,0.4)' : '#1F2225', marginTop: 2 }}>
-                                {fmtDate(startDateStr)} — {fmtDate(endDateStr)}
+                              <Text numberOfLines={1} style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(13), lineHeight: rf(18), color: requestSent ? 'rgba(44,48,52,0.4)' : '#1F2225', marginTop: 2 }}>
+                                {rentalRange.end ? `${fmtDate(startDateStr)} — ${fmtDate(endDateStr)}` : fmtDate(startDateStr)}
+                              </Text>
+                              <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(9), lineHeight: rf(13), color: 'rgba(44,48,52,0.5)', marginTop: 2 }}>
+                                ({demoRentalDays} day{demoRentalDays !== 1 ? 's' : ''})
                               </Text>
                             </View>
-                            {!requestSent && (
-                              <Ionicons name="create-outline" size={16} color="rgba(44,48,52,0.4)" />
-                            )}
+                            <AppIcon name="calendar" size={14} color={requestSent ? 'rgba(44,48,52,0.3)' : '#1F2225'} />
                           </TouchableOpacity>
 
 
 
-                          {/* ── Pricing card with deposit, divider, total ── */}
+                          {/* ── Pricing card — rent / deposit hold / total with right-aligned amounts ── */}
                           <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 10, backgroundColor: colors.white }}>
-                            {/* Daily rate — prominent */}
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(26), lineHeight: rf(32), color: '#1F2225' }}>{formatMoney(dailyPrice)}</Text>
-                              <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(10), lineHeight: rf(16), letterSpacing: 0.9, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>/ DAY</Text>
+                            {/* Rent — daily rate left, amount right */}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                              <Text numberOfLines={1} style={{ flex: 1, fontFamily: fontFamilies.inter.regular, fontSize: rf(11), lineHeight: rf(16), color: 'rgba(44,48,52,0.5)' }}>{formatMoney(dailyPrice)} / day</Text>
+                              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(14), lineHeight: rf(22), color: '#1F2225' }}>{formatMoney(dynamicTotal)}</Text>
                             </View>
-                            {/* Deposit subtitle */}
-                            <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(10), lineHeight: rf(15), color: 'rgba(44,48,52,0.4)', marginTop: 2 }}>{formatMoney(depositAmount)} deposit hold</Text>
+                            {/* Deposit hold — label left, amount right */}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                              <Text numberOfLines={1} style={{ flex: 1, fontFamily: fontFamilies.inter.regular, fontSize: rf(11), lineHeight: rf(16), color: 'rgba(44,48,52,0.5)' }}>Deposit Hold</Text>
+                              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(14), lineHeight: rf(22), color: '#1F2225' }}>{formatMoney(depositAmount)}</Text>
+                            </View>
                             {/* Divider */}
                             <View style={{ height: 1, backgroundColor: '#ECEEEF', marginVertical: 8 }} />
-                            {/* Total + reassurance */}
+                            {/* Total — label left, hero amount right */}
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(16), lineHeight: rf(22), color: '#1F2225' }}>{formatMoney(dynamicTotal)} TOTAL</Text>
-                              {!requestSent ? (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                  <Ionicons name="lock-closed-outline" size={11} color="rgba(44,48,52,0.4)" />
-                                  <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(9), lineHeight: rf(13), color: 'rgba(44,48,52,0.5)' }}>Charged at pickup</Text>
-                                </View>
-                              ) : (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: colors.signalLime, borderRadius: 4 }}>
-                                  <Ionicons name="checkmark-circle" size={10} color="#1F2225" />
-                                  <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(8), lineHeight: rf(12), color: '#1F2225' }}>Auto-approving</Text>
-                                </View>
-                              )}
+                              <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(10), lineHeight: rf(15), letterSpacing: 0.6, textTransform: 'uppercase', color: 'rgba(44,48,52,0.5)' }}>Total</Text>
+                              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(16), lineHeight: rf(32), color: '#1F2225' }}>{formatMoney(dynamicTotal + depositAmount)}</Text>
                             </View>
+                            {/* Charged at pickup — right-aligned */}
+                            {!requestSent && (
+                              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                                <Ionicons name="lock-closed-outline" size={11} color="rgba(44,48,52,0.4)" />
+                                <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(9), lineHeight: rf(13), color: 'rgba(44,48,52,0.5)' }}>Charged at pickup</Text>
+                              </View>
+                            )}
                           </View>
 
-                          {/* ── Message owner ── */}
-                          <TouchableOpacity onPress={handleMessageOwner} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                              <Ionicons name="chatbubble-outline" size={14} color="rgba(44,48,52,0.4)" />
-                              <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(11), lineHeight: rf(16), color: 'rgba(44,48,52,0.6)' }}>Message {owner?.fullName ?? 'Owner'}</Text>
+                          {/* ── Message owner card — picture + replies in + CTA ── */}
+                          <TouchableOpacity
+                            onPress={handleMessageOwner}
+                            activeOpacity={0.8}
+                            style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 12, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+                          >
+                            {/* Owner picture */}
+                            <View style={{ width: 44, height: 44, borderRadius: 9999, backgroundColor: '#ECEEEF', overflow: 'hidden' }}>
+                              <View style={{ flex: 1, backgroundColor: colors.graphite300, opacity: 0.25 }} />
                             </View>
-                            <Ionicons name="arrow-forward" size={12} color="rgba(44,48,52,0.3)" />
+                            {/* Name + replies in */}
+                            <View style={{ flex: 1 }}>
+                              <Text numberOfLines={1} style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(13), lineHeight: rf(18), color: '#1F2225' }}>
+                                {owner?.fullName ?? 'Marc Giroud'}
+                              </Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
+                                <Ionicons name="flash" size={9} color={colors.signalLime} />
+                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>
+                                  Replies in 5m
+                                </Text>
+                              </View>
+                            </View>
+                            {/* CTA — plain message icon, no background */}
+                            <Ionicons name="chatbubble-outline" size={18} color="#1F2225" />
                           </TouchableOpacity>
                         </>
                       )}
@@ -629,75 +794,36 @@ export default function RentalDetailScreen() {
                       {/* ═══════════════════════════════════════════════════ */}
                       {i === 1 && (
                         <>
-                          {/* ── Status row + SLA ── */}
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <View style={{ width: 8, height: 8, backgroundColor: colors.signalLime, borderRadius: 9999 }} />
-                            <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(10), lineHeight: rf(15), letterSpacing: 1, textTransform: 'uppercase', color: '#1F2225' }}>Booking Confirmed</Text>
-                            <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.4)' }}>· Pickup in {daysDiff} day{daysDiff !== 1 ? 's' : ''}</Text>
-                          </View>
-
-                          {/* ── Duration + Total + Deposit with border container ── */}
-                          <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 10, backgroundColor: colors.white }}>
-                            <View style={{ flexDirection: 'row', gap: 12 }}>
-                              <View style={{ flex: 1 }}>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>Dates</Text>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(12), lineHeight: rf(17), color: '#1F2225', marginTop: 2 }}>
-                                  {new Date(rental.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(rental.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                </Text>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.regular, fontSize: rf(8), lineHeight: rf(12), color: 'rgba(44,48,52,0.4)', marginTop: 1 }}>{daysDiff} FULL DAYS</Text>
-                              </View>
-                              <View style={{ flex: 1 }}>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>Total Paid</Text>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(12), lineHeight: rf(17), color: '#1F2225', marginTop: 2 }}>{formatMoney(rental.rentalCharge + rental.fees)}</Text>
-                                <View style={{ alignSelf: 'flex-start', paddingHorizontal: 6, paddingVertical: 1, backgroundColor: '#1F2225', borderRadius: 3, marginTop: 2 }}>
-                                  <Text style={{ fontFamily: fontFamilies.ibmPlexMono.regular, fontSize: rf(7), lineHeight: rf(11), letterSpacing: 0.02, color: colors.signalLime }}>SETTLED</Text>
-                                </View>
-                              </View>
+                          {/* ── Pickup date — one day before rental start ── */}
+                          <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 12, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                            <View style={{ width: 40, height: 40, backgroundColor: '#F8F9F9', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
+                              <Ionicons name="calendar-outline" size={18} color="#1F2225" />
                             </View>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, backgroundColor: '#1F2225', borderRadius: 6, marginTop: 10 }}>
-                              <View>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Security Deposit Hold</Text>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(15), lineHeight: rf(20), color: colors.white, marginTop: 1 }}>{formatMoney(rental.depositHold)}</Text>
-                              </View>
-                              <AppIcon name="lock" size={12} color={colors.signalLime} />
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>Pickup Date</Text>
+                              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(16), lineHeight: rf(22), color: '#1F2225', marginTop: 2 }}>
+                                {new Date(demoPickupMs).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                              </Text>
+                              <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.5)', marginTop: 2 }}>08:00 AM — 10:00 AM</Text>
                             </View>
                           </View>
 
-                          {/* ── Divider ── */}
-                          <View style={{ height: 1, backgroundColor: '#ECEEEF' }} />
-
-                          {/* ── QR Verification with border container ── */}
-                          <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 12, backgroundColor: colors.white, alignItems: 'center' }}>
-                            <View style={{ width: 100, height: 100, backgroundColor: '#F8F9F9', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
-                              <Ionicons name="qr-code" size={56} color="#1F2225" />
-                            </View>
-                            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-                              {['8', '8', '2', '1'].map((d, j) => (
-                                <View key={j} style={{ width: 36, height: 42, backgroundColor: '#1F2225', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
-                                  <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(18), lineHeight: rf(24), color: colors.signalLime }}>{d}</Text>
-                                </View>
-                              ))}
-                            </View>
-                            <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.4)', marginTop: 8 }}>Show to host for scanning</Text>
-                          </View>
-
-                          {/* ── Pickup Logistics with border container ── */}
+                          {/* ── Pickup Location with border container ── */}
                           <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 10, backgroundColor: colors.white }}>
                             <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
-                              <AppIcon name="location" size={16} color="#1F2225" />
+                              <View style={{ width: 40, height: 40, backgroundColor: '#F8F9F9', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
+                                <Ionicons name="location-outline" size={18} color="#1F2225" />
+                              </View>
                               <View style={{ flex: 1 }}>
                                 <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(12), lineHeight: rf(17), color: '#1F2225' }}>{listing?.pickupArea ?? '128 Route des Gaillands, 74400 Chamonix'}</Text>
-                                <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.5)', marginTop: 1 }}>{fmtDate(startDateStr)}, 08:00 AM – 10:00 AM</Text>
-                                <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.5)', marginTop: 4 }}>Park at climber's lot. Silver Airstream.</Text>
-                                <TouchableOpacity style={{ marginTop: 4 }}>
-                                  <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(10), lineHeight: rf(14), color: '#1F2225' }}>Get Directions →</Text>
+                                <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.5)', marginTop: 1 }}>Park at climber's lot. Silver Airstream.</Text>
+                                <TouchableOpacity style={{ marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                  <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(10), lineHeight: rf(14), color: '#1F2225', textDecorationLine: 'underline' }}>Get Directions</Text>
+                                  <AppIcon name="chevron-right" size={6.25} color="#1F2225" />
                                 </TouchableOpacity>
                               </View>
                             </View>
                           </View>
-
-                          {/* ── Divider ── */}
-                          <View style={{ height: 1, backgroundColor: '#ECEEEF' }} />
 
                           {/* ── Inspection Checklist with border container ── */}
                           <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 10, backgroundColor: colors.white }}>
@@ -710,29 +836,27 @@ export default function RentalDetailScreen() {
                                 <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(11), lineHeight: rf(16), color: 'rgba(44,48,52,0.7)' }}>{item}</Text>
                               </TouchableOpacity>
                             ))}
-                            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, backgroundColor: '#F8F9F9', borderRadius: 6, marginTop: 8 }}>
-                              <Ionicons name="camera-outline" size={16} color="rgba(44,48,52,0.4)" />
-                              <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.5)' }}>Snap condition photos</Text>
-                            </TouchableOpacity>
                           </View>
 
-                          {/* ── Divider ── */}
-                          <View style={{ height: 1, backgroundColor: '#ECEEEF' }} />
-
-                          {/* ── Financial Hold ── */}
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, padding: 10, backgroundColor: '#F8F9F9', borderRadius: 6 }}>
-                            <Ionicons name="lock-closed-outline" size={12} color="rgba(44,48,52,0.4)" />
-                            <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(9), lineHeight: rf(13), color: 'rgba(44,48,52,0.5)' }}>{formatMoney(dynamicTotal)} charged · {formatMoney(depositAmount)} deposit hold active</Text>
-                          </View>
-
-                          {/* ── Message owner ── */}
-                          <TouchableOpacity onPress={handleMessageOwner} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                              <Ionicons name="chatbubble-outline" size={14} color="rgba(44,48,52,0.4)" />
-                              <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.6)' }}>Message {owner?.fullName ?? 'Owner'}</Text>
+                          {/* ── Rental dates + total charged at pickup ── */}
+                          <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 12, backgroundColor: colors.white }}>
+                            <View style={{ flexDirection: 'column', gap: 12 }}>
+                              <View>
+                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>Rental Dates</Text>
+                                <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(14), lineHeight: rf(20), color: '#1F2225', marginTop: 2 }}>
+                                  {fmtDate(startDateStr)} - {fmtDate(endDateStr)}
+                                </Text>
+                                <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(9), lineHeight: rf(13), color: 'rgba(44,48,52,0.5)', marginTop: 2 }}>{daysDiff} FULL DAYS</Text>
+                              </View>
+                              {/* Divider between the two sections */}
+                              <View style={{ height: 1, backgroundColor: '#ECEEEF' }} />
+                              <View>
+                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>Charged at Pickup</Text>
+                                <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(18), lineHeight: rf(24), color: '#1F2225', marginTop: 2 }}>{formatMoney(dynamicTotal + depositAmount)}</Text>
+                                <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(9), lineHeight: rf(13), color: 'rgba(44,48,52,0.5)', marginTop: 2 }}>{formatMoney(dynamicTotal)} rent · {formatMoney(depositAmount)} hold</Text>
+                              </View>
                             </View>
-                            <Ionicons name="arrow-forward" size={11} color="rgba(44,48,52,0.3)" />
-                          </TouchableOpacity>
+                          </View>
                         </>
                       )}
 
@@ -741,46 +865,53 @@ export default function RentalDetailScreen() {
                       {/* ═══════════════════════════════════════════════════ */}
                       {i === 2 && (
                         <>
-                          {/* ── Dates/Total/Deposit with border container ── */}
-                          <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 10, backgroundColor: colors.white }}>
-                            <View style={{ flexDirection: 'row', gap: 12 }}>
-                              <View style={{ flex: 1 }}>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>Rental</Text>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(12), lineHeight: rf(17), color: '#1F2225', marginTop: 2 }}>
-                                  {new Date(rental.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(rental.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                </Text>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.regular, fontSize: rf(8), lineHeight: rf(12), color: 'rgba(44,48,52,0.4)', marginTop: 1 }}>{daysDiff} FULL DAYS</Text>
-                              </View>
-                              <View style={{ flex: 1 }}>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>Total Paid</Text>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(12), lineHeight: rf(17), color: '#1F2225', marginTop: 2 }}>{formatMoney(rental.rentalCharge + rental.fees)}</Text>
-                                <View style={{ alignSelf: 'flex-start', paddingHorizontal: 6, paddingVertical: 1, backgroundColor: '#1F2225', borderRadius: 3, marginTop: 2 }}>
-                                  <Text style={{ fontFamily: fontFamilies.ibmPlexMono.regular, fontSize: rf(7), lineHeight: rf(11), letterSpacing: 0.02, color: colors.signalLime }}>SETTLED</Text>
-                                </View>
-                              </View>
+                          {/* ── Return date — exact date + days left ── */}
+                          <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 12, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                            <View style={{ width: 40, height: 40, backgroundColor: '#F8F9F9', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
+                              <Ionicons name="calendar-outline" size={18} color="#1F2225" />
                             </View>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, backgroundColor: '#1F2225', borderRadius: 6, marginTop: 10 }}>
-                              <View>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Security Deposit Hold</Text>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(15), lineHeight: rf(20), color: colors.white, marginTop: 1 }}>{formatMoney(rental.depositHold)}</Text>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>Return Date</Text>
+                              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(15), lineHeight: rf(21), color: '#1F2225', marginTop: 2 }}>
+                                {new Date(rental.endDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                              </Text>
+                              <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.5)', marginTop: 1 }}>by 10:00 AM</Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                <View style={{ width: 6, height: 6, borderRadius: 9999, backgroundColor: colors.signalLime }} />
+                                <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(11), lineHeight: rf(15), color: '#1F2225' }}>{daysDiff} day{daysDiff !== 1 ? 's' : ''} left</Text>
                               </View>
-                              <AppIcon name="lock" size={12} color={colors.signalLime} />
                             </View>
                           </View>
 
-                          {/* ── Return Countdown (hero) ── */}
-                          <View style={{ padding: 20, backgroundColor: '#1F2225', borderRadius: 10 }}>
-                            <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Return Due In</Text>
-                            <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(30), lineHeight: rf(36), color: colors.signalLime, marginTop: 4 }}>{daysDiff} day{daysDiff !== 1 ? 's' : ''}</Text>
-                            <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(11), lineHeight: rf(15), color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{new Date(rental.endDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} by 10:00 AM</Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
-                              <AppIcon name="location" size={11} color={colors.signalLime} />
-                              <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(255,255,255,0.6)' }}>{listing?.pickupArea ?? 'Same pickup location'}</Text>
+                          {/* ── Security deposit — repaid on return ── */}
+                          <View style={{ padding: 14, backgroundColor: '#1F2225', borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                            <View style={{ width: 40, height: 40, backgroundColor: '#F8F9F9', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
+                              <Ionicons name="lock-closed-outline" size={18} color="#1F2225" />
+                            </View>
+                            <View>
+                              <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Security Deposit</Text>
+                              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(18), lineHeight: rf(24), color: colors.white, marginTop: 2 }}>{formatMoney(rental.depositHold)}</Text>
+                              <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(9), lineHeight: rf(13), color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>Repaid on return</Text>
                             </View>
                           </View>
 
-                          {/* ── Divider ── */}
-                          <View style={{ height: 1, backgroundColor: '#ECEEEF' }} />
+                          {/* ── QR code — owner scans at return (no CTA) ── */}
+                          <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 12, backgroundColor: colors.white, alignItems: 'center' }}>
+                            <View style={{ alignSelf: 'stretch' }}>
+                              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(11), lineHeight: rf(15), textTransform: 'uppercase', color: '#1F2225' }}>Return QR</Text>
+                              <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.5)', marginTop: 2 }}>Owner scans this on the return date</Text>
+                            </View>
+                            <View style={{ marginTop: 12, padding: 14, borderWidth: 1, borderColor: '#ECEEEF', borderRadius: 8, backgroundColor: colors.white, alignItems: 'center' }}>
+                              {/* QR stays dimmed until the return date */}
+                              <View style={{ opacity: 0.25 }}>
+                                <ReturnQrCode />
+                              </View>
+                              <View style={{ position: 'absolute', top: 14, left: 14, right: 14, bottom: 14, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.55)', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                <Ionicons name="lock-closed-outline" size={15} color="rgba(44,48,52,0.45)" />
+                                <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(9), lineHeight: rf(13), color: 'rgba(44,48,52,0.6)' }}>Will unlock on return date</Text>
+                              </View>
+                            </View>
+                          </View>
 
                           {/* ── Return Checklist with border container ── */}
                           <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 10, backgroundColor: colors.white }}>
@@ -793,33 +924,76 @@ export default function RentalDetailScreen() {
                                 <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(11), lineHeight: rf(16), color: 'rgba(44,48,52,0.7)' }}>{item}</Text>
                               </TouchableOpacity>
                             ))}
-                            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, backgroundColor: '#F8F9F9', borderRadius: 6, marginTop: 8 }}>
-                              <Ionicons name="camera-outline" size={16} color="rgba(44,48,52,0.4)" />
-                              <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.5)' }}>Upload drop-off photos</Text>
-                            </TouchableOpacity>
                           </View>
 
-                          {/* ── Divider ── */}
-                          <View style={{ height: 1, backgroundColor: '#ECEEEF' }} />
-
-                          {/* ── Quick Actions — flat list ── */}
-                          <View style={{ gap: 0 }}>
-                            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#ECEEEF' }}>
-                              <Ionicons name="time-outline" size={16} color="#1F2225" />
-                              <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(11), lineHeight: rf(16), color: '#1F2225', flex: 1 }}>Request Extension</Text>
-                              <Ionicons name="arrow-forward" size={12} color="rgba(44,48,52,0.3)" />
+                          {/* ── Change of plans? dropdown ── */}
+                          <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, backgroundColor: colors.white }}>
+                            <TouchableOpacity
+                              onPress={() => setShowPlansMenu(!showPlansMenu)}
+                              activeOpacity={0.7}
+                              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 12 }}
+                            >
+                              <Ionicons name="swap-horizontal-outline" size={16} color="#1F2225" />
+                              <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(11), lineHeight: rf(16), color: '#1F2225', flex: 1 }}>Change of plans?</Text>
+                              <Ionicons name={showPlansMenu ? 'chevron-up' : 'chevron-down'} size={14} color="rgba(44,48,52,0.3)" />
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={handleMessageOwner} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#ECEEEF' }}>
-                              <Ionicons name="chatbubble-outline" size={15} color="#1F2225" />
-                              <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(11), lineHeight: rf(16), color: '#1F2225', flex: 1 }}>Message Host</Text>
-                              <Ionicons name="arrow-forward" size={12} color="rgba(44,48,52,0.3)" />
-                            </TouchableOpacity>
-                            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 }}>
-                              <Ionicons name="flag-outline" size={16} color="#EF4444" />
-                              <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(11), lineHeight: rf(16), color: '#EF4444', flex: 1 }}>Report Issue</Text>
-                              <Ionicons name="arrow-forward" size={12} color="rgba(44,48,52,0.3)" />
-                            </TouchableOpacity>
+                            {showPlansMenu && (
+                              <View style={{ gap: 6, padding: 8, borderTopWidth: 1, borderTopColor: '#ECEEEF', backgroundColor: '#F8F9F9', borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }}>
+                                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 10, backgroundColor: colors.white, borderRadius: 6 }}>
+                                  <View style={{ width: 28, height: 28, backgroundColor: '#F0F1F2', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="return-down-back-outline" size={14} color="#1F2225" />
+                                  </View>
+                                  <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(10), lineHeight: rf(15), color: '#1F2225', flex: 1 }}>Return early</Text>
+                                  <AppIcon name="chevron-right" size={6.25} color="rgba(44,48,52,0.3)" />
+                                </TouchableOpacity>
+                                {canRequestExtension && (
+                                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 10, backgroundColor: colors.white, borderRadius: 6 }}>
+                                    <View style={{ width: 28, height: 28, backgroundColor: '#F0F1F2', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
+                                      <Ionicons name="time-outline" size={14} color="#1F2225" />
+                                    </View>
+                                    <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(10), lineHeight: rf(15), color: '#1F2225', flex: 1 }}>Request extension</Text>
+                                    <AppIcon name="chevron-right" size={6.25} color="rgba(44,48,52,0.3)" />
+                                  </TouchableOpacity>
+                                )}
+                              </View>
+                            )}
                           </View>
+
+                          {/* ── Message owner card — same as request phase ── */}
+                          <TouchableOpacity
+                            onPress={handleMessageOwner}
+                            activeOpacity={0.8}
+                            style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 12, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+                          >
+                            {/* Owner picture */}
+                            <View style={{ width: 44, height: 44, borderRadius: 9999, backgroundColor: '#ECEEEF', overflow: 'hidden' }}>
+                              <View style={{ flex: 1, backgroundColor: colors.graphite300, opacity: 0.25 }} />
+                            </View>
+                            {/* Name + replies in */}
+                            <View style={{ flex: 1 }}>
+                              <Text numberOfLines={1} style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(13), lineHeight: rf(18), color: '#1F2225' }}>
+                                {owner?.fullName ?? 'Marc Giroud'}
+                              </Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
+                                <Ionicons name="flash" size={9} color={colors.signalLime} />
+                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>
+                                  Replies in 5m
+                                </Text>
+                              </View>
+                            </View>
+                            {/* CTA — plain message icon, no background */}
+                            <Ionicons name="chatbubble-outline" size={18} color="#1F2225" />
+                          </TouchableOpacity>
+
+                          {/* ── Report Issue ── */}
+                          <TouchableOpacity
+                            activeOpacity={0.7}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, backgroundColor: colors.white, paddingHorizontal: 12, paddingVertical: 12 }}
+                          >
+                            <Ionicons name="flag-outline" size={16} color="#EF4444" />
+                            <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(11), lineHeight: rf(16), color: '#EF4444', flex: 1 }}>Report Issue</Text>
+                            <AppIcon name="chevron-right" size={6.25} color="rgba(44,48,52,0.3)" />
+                          </TouchableOpacity>
                         </>
                       )}
 
@@ -828,79 +1002,56 @@ export default function RentalDetailScreen() {
                       {/* ═══════════════════════════════════════════════════ */}
                       {i === 3 && (
                         <>
-                          {/* ── Deposit Release (hero) ── */}
-                          <View style={{ padding: 20, backgroundColor: '#1F2225', borderRadius: 10 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                              <View style={{ width: 24, height: 24, backgroundColor: 'rgba(200,255,61,0.2)', borderRadius: 9999, alignItems: 'center', justifyContent: 'center' }}>
-                                <Ionicons name="checkmark-circle" size={15} color={colors.signalLime} />
+                          {/* ── Rental complete card (white) ── */}
+                          <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 14, backgroundColor: colors.white }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <View style={{ width: 24, height: 24, backgroundColor: 'rgba(200,255,61,0.4)', borderRadius: 9999, alignItems: 'center', justifyContent: 'center' }}>
+                                <Ionicons name="checkmark-circle-outline" size={15} color="#1F2225" />
                               </View>
-                              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(17), lineHeight: rf(22), color: colors.signalLime }}>Rental Complete!</Text>
+                              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(17), lineHeight: rf(22), color: '#1F2225' }}>Rental Complete!</Text>
                             </View>
-                            <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.1)' }} />
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-                              <View>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Deposit Hold Released</Text>
-                                <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(22), lineHeight: rf(28), color: colors.signalLime, marginTop: 2 }}>{formatMoney(rental.depositHold)}</Text>
-                              </View>
-                              <Ionicons name="lock-open-outline" size={18} color={colors.signalLime} />
-                            </View>
-                          </View>
-
-                          {/* ── Divider ── */}
-                          <View style={{ height: 1, backgroundColor: '#ECEEEF' }} />
-
-                          {/* ── Total/Dates/Owner with border container ── */}
-                          <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 10, backgroundColor: colors.white }}>
+                            <View style={{ height: 1, backgroundColor: '#ECEEEF', marginVertical: 10 }} />
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(16), lineHeight: rf(22), color: '#1F2225' }}>{formatMoney(dynamicTotal)}</Text>
-                              <View style={{ paddingHorizontal: 8, paddingVertical: 2, backgroundColor: '#1F2225', borderRadius: 4 }}>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.regular, fontSize: rf(7), lineHeight: rf(11), color: colors.signalLime }}>SETTLED</Text>
+                              <View>
+                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>Deposit Hold Released</Text>
+                                <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(22), lineHeight: rf(28), color: '#1F2225', marginTop: 2 }}>{formatMoney(rental.depositHold)}</Text>
                               </View>
+                              <Ionicons name="lock-open-outline" size={18} color="rgba(44,48,52,0.4)" />
                             </View>
-                            <View style={{ height: 1, backgroundColor: '#ECEEEF', marginVertical: 8 }} />
-                            <View style={{ flexDirection: 'row', gap: 12 }}>
-                              <View style={{ flex: 1 }}>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>Rental Dates</Text>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(12), lineHeight: rf(17), color: '#1F2225', marginTop: 2 }}>
-                                  {new Date(rental.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(rental.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                </Text>
-                              </View>
-                              <View style={{ flex: 1 }}>
-                                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>Owner</Text>
-                                <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(12), lineHeight: rf(17), color: '#1F2225', marginTop: 2 }}>{owner?.fullName ?? 'Marc Giroud'}</Text>
-                              </View>
-                            </View>
+                            <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.5)', marginTop: 8 }}>
+                              Thanks for renting with GearShare — your deposit has been released.
+                            </Text>
                           </View>
 
-                          {/* ── Divider ── */}
-                          <View style={{ height: 1, backgroundColor: '#ECEEEF' }} />
-
-                          {/* ── Rating with border container ── */}
-                          <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 12, backgroundColor: colors.white, alignItems: 'center' }}>
-                            <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(13), lineHeight: rf(18), color: '#1F2225', textAlign: 'center' }}>
-                              Rate {owner?.fullName?.split(' ')[0] ?? 'Marc'}
+                          {/* ── Review box — rate the owner + write a review ── */}
+                          <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 14, backgroundColor: colors.white }}>
+                            <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(11), lineHeight: rf(15), textTransform: 'uppercase', color: '#1F2225' }}>Leave a Review</Text>
+                            <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.5)', marginTop: 2 }}>
+                              How was your rental with {owner?.fullName?.split(' ')[0] ?? 'Marc'}?
                             </Text>
-                            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                            {/* Rate stars — tap to select */}
+                            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
                               {[1, 2, 3, 4, 5].map((star) => (
-                                <TouchableOpacity key={star} style={{ width: 36, height: 36, backgroundColor: '#F8F9F9', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
-                                  <Text style={{ fontSize: rf(18), color: '#FACC15' }}>★</Text>
+                                <TouchableOpacity
+                                  key={star}
+                                  onPress={() => setReviewRating(star)}
+                                  activeOpacity={0.7}
+                                  style={{ width: 36, height: 36, backgroundColor: '#F8F9F9', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+                                >
+                                  <Text style={{ fontSize: rf(18), color: reviewRating >= star ? '#FACC15' : 'rgba(44,48,52,0.2)' }}>★</Text>
                                 </TouchableOpacity>
                               ))}
                             </View>
-                            <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.4)', marginTop: 8 }}>Tap a star to leave a review</Text>
+                            {/* Review text */}
+                            <TextInput
+                              value={reviewText}
+                              onChangeText={setReviewText}
+                              placeholder="Share your experience..."
+                              placeholderTextColor="rgba(44,48,52,0.35)"
+                              multiline
+                              style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 10, minHeight: 80, marginTop: 12, fontFamily: fontFamilies.inter.regular, fontSize: rf(11), lineHeight: rf(16), color: '#1F2225', textAlignVertical: 'top' }}
+                            />
                           </View>
-
-                          {/* ── Divider ── */}
-                          <View style={{ height: 1, backgroundColor: '#ECEEEF' }} />
-
-                          {/* ── Message owner ── */}
-                          <TouchableOpacity onPress={handleMessageOwner} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                              <Ionicons name="chatbubble-outline" size={14} color="rgba(44,48,52,0.4)" />
-                              <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.6)' }}>Message {owner?.fullName ?? 'Owner'}</Text>
-                            </View>
-                            <Ionicons name="arrow-forward" size={11} color="rgba(44,48,52,0.3)" />
-                          </TouchableOpacity>
                         </>
                       )}
                     </View>
@@ -913,6 +1064,104 @@ export default function RentalDetailScreen() {
       </ScrollView>
 
       {/* ════════════════════════════════════════════════════════════ */}
+      {/* ── RENTAL DETAILS SHEET — gear preview + dates & amount ── */}
+      {/* ── Rendered before the gear modal so the gear sheet stacks on top ── */}
+      {/* ════════════════════════════════════════════════════════════ */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showRentalDetails}
+        onRequestClose={() => setShowRentalDetails(false)}
+      >
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          {/* Backdrop tap to close */}
+          <TouchableOpacity
+            activeOpacity={1}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)' }}
+            onPress={() => setShowRentalDetails(false)}
+          />
+          {/* Sheet content — full borderRadius with bottom corners zeroed for reliable rounding */}
+          <View style={{
+            backgroundColor: colors.background,
+            borderRadius: radius.bottomSheet,
+            borderBottomLeftRadius: 0,
+            borderBottomRightRadius: 0,
+            overflow: 'hidden',
+            paddingHorizontal: spacing.xl,
+            paddingTop: spacing.lg,
+            paddingBottom: 40,
+            height: '80%',
+          }}>
+            {/* Drag handle */}
+            <View style={{ width: 40, height: 4, backgroundColor: '#DDE1E3', borderRadius: 2, alignSelf: 'center', marginBottom: spacing.lg }} />
+
+            {/* Header + close */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: spacing.lg }}>
+              <Text numberOfLines={1} style={{ flex: 1, fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(18), lineHeight: rf(26), letterSpacing: -0.45, textTransform: 'uppercase', color: '#1F2225' }}>
+                Rental Details
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowRentalDetails(false)}
+                style={{ width: 36, height: 36, backgroundColor: colors.white, borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Ionicons name="close" size={14} color="#1F2225" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* ── Gear preview card — tap to open the full gear sheet on top ── */}
+              <TouchableOpacity
+                onPress={() => setShowProductModal(true)}
+                activeOpacity={0.8}
+                style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 12, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: spacing.lg }}
+              >
+                <View style={{ width: 48, height: 48, backgroundColor: '#ECEEEF', borderRadius: 6 }}>
+                  <View style={{ flex: 1, backgroundColor: colors.graphite300, opacity: 0.2 }} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(14), lineHeight: rf(18), textTransform: 'uppercase', color: '#1F2225' }} numberOfLines={1}>
+                    {gear?.name ?? 'Black Diamond Camalot C4 Set'}
+                  </Text>
+                  <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.6)', marginTop: 2 }}>{owner?.fullName ?? 'Marc Giroud'}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={14} color="rgba(44,48,52,0.3)" />
+              </TouchableOpacity>
+
+              {/* ── Rental info: dates & amount ── */}
+              <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 12, backgroundColor: colors.white }}>
+                <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)', marginBottom: 8 }}>Rental Details</Text>
+                {/* Dates */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(11), lineHeight: rf(16), color: 'rgba(44,48,52,0.5)' }}>Dates</Text>
+                  <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(12), lineHeight: rf(17), color: '#1F2225' }}>
+                    {fmtDate(rental.startDate)} — {fmtDate(rental.endDate)}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                  <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(11), lineHeight: rf(16), color: 'rgba(44,48,52,0.5)' }}>Duration</Text>
+                  <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(11), lineHeight: rf(16), color: '#1F2225' }}>
+                    {daysDiff} day{daysDiff !== 1 ? 's' : ''}
+                  </Text>
+                </View>
+                {/* Divider */}
+                <View style={{ height: 1, backgroundColor: '#ECEEEF', marginVertical: 10 }} />
+                {/* Total */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(11), lineHeight: rf(16), textTransform: 'uppercase', color: 'rgba(44,48,52,0.6)' }}>Total</Text>
+                  <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(18), lineHeight: rf(24), color: '#1F2225' }}>{formatMoney(rental.rentalCharge + rental.fees + rental.depositHold)}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                  <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.4)' }}>Deposit hold</Text>
+                  <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(10), lineHeight: rf(14), color: 'rgba(44,48,52,0.6)' }}>{formatMoney(rental.depositHold)}
+                  </Text>
+                </View>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ════════════════════════════════════════════════════════════ */}
       {/* ── PRODUCT DETAIL MODAL — bottom sheet with full gear info ── */}
       {/* ════════════════════════════════════════════════════════════ */}
       <Modal
@@ -921,29 +1170,31 @@ export default function RentalDetailScreen() {
         visible={showProductModal}
         onRequestClose={() => setShowProductModal(false)}
       >
-        <View style={{ flex: 1 }}>
-          {/* Backdrop tap to close */}
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          {/* Backdrop tap to close — lighter so the rental details sheet behind stays visible */}
           <TouchableOpacity
             activeOpacity={1}
-            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.2)' }}
             onPress={() => setShowProductModal(false)}
           />
           {/* Sheet content */}
           <View style={{
             backgroundColor: colors.background,
-            borderTopLeftRadius: 20,
-            borderTopRightRadius: 20,
+            borderRadius: radius.bottomSheet,
+            borderBottomLeftRadius: 0,
+            borderBottomRightRadius: 0,
+            overflow: 'hidden',
             paddingHorizontal: spacing.xl,
             paddingTop: spacing.lg,
             paddingBottom: 40,
-            maxHeight: '85%',
+            height: '75%',
           }}>
             {/* Drag handle */}
             <View style={{ width: 40, height: 4, backgroundColor: '#DDE1E3', borderRadius: 2, alignSelf: 'center', marginBottom: spacing.lg }} />
 
-            {/* Close button */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg }}>
-              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(18), lineHeight: rf(26), letterSpacing: -0.45, textTransform: 'uppercase', color: '#1F2225' }}>
+            {/* Close button — title shrinks so the close never overflows */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: spacing.lg }}>
+              <Text numberOfLines={1} style={{ flex: 1, fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(18), lineHeight: rf(26), letterSpacing: -0.45, textTransform: 'uppercase', color: '#1F2225' }}>
                 {gear?.name ?? 'Product Details'}
               </Text>
               <TouchableOpacity
@@ -967,21 +1218,23 @@ export default function RentalDetailScreen() {
                 ))}
               </ScrollView>
 
-              {/* ── Hero section: Price + Rating side by side ── */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: spacing.md }}>
-                <View>
-                  <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(24), lineHeight: rf(30), color: '#1F2225' }}>{formatMoney(dailyPrice)}</Text>
-                  <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.9, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>PER DAY</Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(15), lineHeight: rf(20), color: '#1F2225' }}>★ 4.9</Text>
-                  <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(9), lineHeight: rf(13), color: 'rgba(44,48,52,0.4)' }}>56 reviews</Text>
+              {/* ── Hero section: Price + Rating in a card (same look as the gear page pricing card) ── */}
+              <View style={{ padding: spacing.lg, backgroundColor: '#F8F9F9', borderWidth: 1, borderColor: '#DDE1E3', borderRadius: radius.card, marginBottom: spacing.lg }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                  <View>
+                    <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(24), lineHeight: rf(30), color: '#1F2225' }}>{formatMoney(dailyPrice)}</Text>
+                    <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.9, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>PER DAY</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(15), lineHeight: rf(20), color: '#1F2225' }}>★ 4.9</Text>
+                    <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(9), lineHeight: rf(13), color: 'rgba(44,48,52,0.4)' }}>56 reviews</Text>
+                  </View>
                 </View>
               </View>
 
               {/* ── Section: Technical Specs ── */}
-              <View style={{ backgroundColor: '#F8F9F9', borderRadius: 8, padding: 14, marginBottom: spacing.lg }}>
-                <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(10), lineHeight: rf(14), letterSpacing: 1, textTransform: 'uppercase', color: '#1F2225', marginBottom: 10 }}>Technical Specifications</Text>
+              <View style={{ backgroundColor: '#F8F9F9', borderWidth: 1, borderColor: '#DDE1E3', borderRadius: radius.card, padding: spacing.lg, marginBottom: spacing.lg }}>
+                <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(16), letterSpacing: 1.2, textTransform: 'uppercase', color: '#1F2225', paddingBottom: 8 }}>Technical Specifications</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
                   {[
                     { label: 'WEIGHT', value: '1.28 KG' },
@@ -999,24 +1252,16 @@ export default function RentalDetailScreen() {
                 </View>
               </View>
 
-              {/* ── Section: About ── */}
-              <View style={{ marginBottom: spacing.lg }}>
-                <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(10), lineHeight: rf(14), letterSpacing: 1, textTransform: 'uppercase', color: '#1F2225', marginBottom: 8 }}>Description</Text>
-                <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(13), lineHeight: rf(20), color: 'rgba(44,48,52,0.8)' }}>
-                  Full set of Black Diamond Camalot C4s, ranging from #0.3 to #4. These are the latest model — 10% lighter than previous generations with a redesigned lobe for better grip and surface area contact.
-                </Text>
-              </View>
-
               {/* ── Section: Condition ── */}
-              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(10), lineHeight: rf(14), letterSpacing: 1, textTransform: 'uppercase', color: '#1F2225', marginBottom: 8 }}>Gear Condition</Text>
-              <View style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 14, backgroundColor: colors.white, marginBottom: spacing.lg }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <View style={{ width: 36, height: 36, backgroundColor: 'rgba(200,255,61,0.25)', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="checkmark-circle" size={18} color="#1F2225" />
+              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(16), letterSpacing: 1.2, textTransform: 'uppercase', color: '#1F2225', marginBottom: 8 }}>Gear Condition</Text>
+              <View style={{ padding: spacing.lg, backgroundColor: '#F8F9F9', borderWidth: 1, borderColor: '#DDE1E3', borderRadius: radius.card, marginBottom: spacing.lg }}>
+                <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
+                  <View style={{ width: 48, height: 48, backgroundColor: 'rgba(200,255,61,0.4)', borderRadius: 4, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="checkmark-circle" size={24} color="#1F2225" />
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(17), textTransform: 'uppercase', color: '#1F2225' }}>Excellent Condition</Text>
-                    <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(15), color: 'rgba(44,48,52,0.5)', marginTop: 1 }}>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(14), lineHeight: rf(20), textTransform: 'uppercase', color: '#1F2225' }}>Excellent Condition</Text>
+                    <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(12), lineHeight: rf(20), color: 'rgba(44,48,52,0.6)' }}>
                       Minor cosmetic scratches on lobes. Slings are original with zero signs of wear.
                     </Text>
                   </View>
@@ -1024,35 +1269,60 @@ export default function RentalDetailScreen() {
               </View>
 
               {/* ── Section: Owner ── */}
-              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(10), lineHeight: rf(14), letterSpacing: 1, textTransform: 'uppercase', color: '#1F2225', marginBottom: 8 }}>Gear Owner</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: spacing.lg }}>
-                <View style={{ width: 40, height: 40, backgroundColor: colors.graphite300, borderRadius: 9999 }} />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(13), lineHeight: rf(18), color: '#1F2225' }}>{owner?.fullName ?? 'Marc Giroud'}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 1 }}>
-                    <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.7, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>Verified Guide</Text>
-                    <View style={{ width: 3, height: 3, backgroundColor: '#CFD4D8', borderRadius: 9999 }} />
-                    <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.7, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>120 Rentals</Text>
+              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(16), letterSpacing: 1.2, textTransform: 'uppercase', color: '#1F2225', marginBottom: 8 }}>Gear Owner</Text>
+              <View style={{ padding: spacing.lg, backgroundColor: '#F8F9F9', borderWidth: 1, borderColor: '#DDE1E3', borderRadius: radius.card, marginBottom: spacing.lg }}>
+                <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
+                  {/* Avatar with verified badge */}
+                  <View style={{ width: 55, height: 56, position: 'relative' }}>
+                    <View style={{ width: 55, height: 56, backgroundColor: colors.graphite300, borderRadius: 9999 }} />
+                    <View style={{ position: 'absolute', right: -4, bottom: -4, width: 20, height: 20, backgroundColor: colors.signalLime, borderWidth: 2, borderColor: '#F8F9F9', borderRadius: 9999, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ fontSize: rf(7), color: '#1F2225', fontWeight: '700' }}>✓</Text>
+                    </View>
                   </View>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, height: 26, backgroundColor: '#F8F9F9', borderRadius: 4 }}>
-                  <Ionicons name="flash" size={10} color={colors.signalLime} />
-                  <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(7), lineHeight: rf(11), color: '#1F2225' }}>5m</Text>
+                  {/* Info */}
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(14), lineHeight: rf(20), color: '#1F2225' }}>{owner?.fullName ?? 'Marc Giroud'}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(10), lineHeight: rf(15), color: 'rgba(44,48,52,0.6)' }}>Verified Guide</Text>
+                      <View style={{ width: 4, height: 4, backgroundColor: '#CFD4D8', borderRadius: 9999 }} />
+                      <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(10), lineHeight: rf(15), color: 'rgba(44,48,52,0.6)' }}>120 Rentals</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                      <Ionicons name="flash" size={9} color={colors.signalLime} />
+                      <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(9), lineHeight: rf(14), textTransform: 'uppercase', color: '#1F2225' }}>Responds in 5m</Text>
+                    </View>
+                  </View>
                 </View>
               </View>
 
+              {/* ── Section: About ── */}
+              <View style={{ gap: 4, marginBottom: spacing.lg }}>
+                <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(16), letterSpacing: 1.2, textTransform: 'uppercase', color: '#1F2225' }}>Description</Text>
+                <View style={{ height: 1, backgroundColor: '#ECEEEF' }} />
+              </View>
+              <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(13), lineHeight: rf(20), color: 'rgba(44,48,52,0.8)', marginBottom: spacing.lg }}>
+                Full set of Black Diamond Camalot C4s, ranging from #0.3 to #4. These are the latest model — 10% lighter than previous generations with a redesigned lobe for better grip and surface area contact.
+              </Text>
+
               {/* ── Section: Policies ── */}
-              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(10), lineHeight: rf(14), letterSpacing: 1, textTransform: 'uppercase', color: '#1F2225', marginBottom: 8 }}>Platform Policies</Text>
-              <View style={{ backgroundColor: '#F8F9F9', borderRadius: 8, padding: 14, marginBottom: 20 }}>
+              <View style={{ gap: 4, marginBottom: 8 }}>
+                <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(16), letterSpacing: 1.2, textTransform: 'uppercase', color: '#1F2225' }}>Platform Policies</Text>
+                <View style={{ height: 1, backgroundColor: '#ECEEEF' }} />
+              </View>
+              <View style={{ backgroundColor: '#F8F9F9', borderWidth: 1, borderColor: '#DDE1E3', borderRadius: radius.card, padding: spacing.lg, marginBottom: 20 }}>
                 <View style={{ flexDirection: 'row', gap: 10, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#ECEEEF' }}>
-                  <Ionicons name="shield-checkmark-outline" size={16} color="#1F2225" style={{ marginTop: 2 }} />
+                  <View style={{ marginTop: 2 }}>
+                    <AppIcon name="damage-protection" size={15.75} color="#1F2225" />
+                  </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(10), lineHeight: rf(15), textTransform: 'uppercase', color: '#1F2225' }}>Damage Protection</Text>
                     <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(15), color: 'rgba(44,48,52,0.5)', marginTop: 2 }}>Renters are responsible for replacement costs of lost or non-functional equipment.</Text>
                   </View>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 10, paddingTop: 12 }}>
-                  <Ionicons name="close-circle-outline" size={16} color="#1F2225" style={{ marginTop: 2 }} />
+                  <View style={{ marginTop: 2 }}>
+                    <AppIcon name="calendar" size={14} color="#1F2225" />
+                  </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(10), lineHeight: rf(15), textTransform: 'uppercase', color: '#1F2225' }}>Cancellation</Text>
                     <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(15), color: 'rgba(44,48,52,0.5)', marginTop: 2 }}>Free cancellation until 48h before pickup. 50% fee applies after.</Text>
@@ -1064,6 +1334,76 @@ export default function RentalDetailScreen() {
         </View>
       </Modal>
 
+      {/* ════════════════════════════════════════════════════════════ */}
+      {/* ── OPTIONS DROPDOWN — anchored under the header 3-dot button ── */}
+      {/* ════════════════════════════════════════════════════════════ */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showOptionsMenu}
+        onRequestClose={() => setShowOptionsMenu(false)}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.15)' }}
+          onPress={() => setShowOptionsMenu(false)}
+        >
+          {/* Dropdown card — right-aligned with the 3-dot button */}
+          <View
+            onStartShouldSetResponder={() => true}
+            style={{ position: 'absolute', top: optionsAnchorTop, right: spacing.lg, minWidth: 230, backgroundColor: colors.white, borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 10, paddingVertical: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 6 }}
+          >
+            {/* ── Rental details — opens the rental details sheet ── */}
+            <TouchableOpacity
+              onPress={() => { setShowOptionsMenu(false); setShowRentalDetails(true); }}
+              activeOpacity={0.7}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 }}
+            >
+              <View style={{ width: 28, height: 28, backgroundColor: '#F8F9F9', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
+                <AppIcon name="info" size={14} color="#1F2225" />
+              </View>
+              <Text style={{ flex: 1, fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(17), color: '#1F2225' }}>Rental Details</Text>
+            </TouchableOpacity>
+
+            {/* ── Cancel rental — only in the request phase and at least 48h before pickup ── */}
+            {canShowCancelOption && (
+              <>
+                <View style={{ height: 1, backgroundColor: '#ECEEEF', marginHorizontal: 12 }} />
+                <TouchableOpacity
+                  onPress={handleCancelRental}
+                  activeOpacity={0.7}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 }}
+                >
+                  {/* Icon tile matches the info icon's 14px size and tile */}
+                  <View style={{ width: 28, height: 28, backgroundColor: '#F8F9F9', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="close-circle-outline" size={14} color="#EF4444" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(17), color: '#EF4444' }}>Cancel Rental</Text>
+                  </View>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── Cancel rental confirmation — destructive, explains consequences ── */}
+      <AlpineDialog
+        visible={showCancelDialog}
+        title="Cancel this rental?"
+        message={
+          isDemo
+            ? 'You are more than 48 hours before pickup, so no charge applies and your deposit hold will be released.'
+            : 'Cancel this rental request? No charge applies before pickup.'
+        }
+        confirmLabel="Cancel Rental"
+        cancelLabel="Keep Rental"
+        onConfirm={confirmCancelRental}
+        onCancel={() => setShowCancelDialog(false)}
+        destructive
+        testID="cancel-rental-dialog"
+      />
     </View>
   );
 }

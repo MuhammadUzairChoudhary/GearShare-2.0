@@ -7,12 +7,30 @@ export function formatDate(dateString: string): string {
   });
 }
 
+/** Compact date for summary cards (e.g. "Aug 15"). */
+export function formatShortDate(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 export function formatDateTime(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+/** Clock time for message bubbles (e.g. "2:41 PM"). */
+export function formatTime(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
   });

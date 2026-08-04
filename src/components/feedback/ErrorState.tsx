@@ -14,8 +14,8 @@ interface ErrorStateProps {
 }
 
 export function ErrorState({
-  title = 'Something went wrong',
-  message = "We couldn't load this content. Please try again.",
+  title = "We couldn't load this content",
+  message = 'Your data is safe. Check your connection and try again.',
   onRetry,
   testID,
 }: ErrorStateProps) {
@@ -38,7 +38,7 @@ export function ErrorState({
       <AppText variant="bodyMedium" color="textSecondary" align="center">
         {message}
       </AppText>
-      {onRetry && <AppButton title="Try Again" onPress={onRetry} variant="secondary" size="md" />}
+      {onRetry && <AppButton title="Try Again" onPress={onRetry} variant="secondary" size="medium" />}
     </View>
   );
 }

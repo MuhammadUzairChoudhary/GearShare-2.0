@@ -79,6 +79,26 @@ describe('Mock Repositories', () => {
       expect(message.id).toBeDefined();
       expect(message.body).toBe('Test message');
     });
+
+    it('should return conversations with the counterparty and unread counts', async () => {
+      const conversations = await repo.getConversations('user-1');
+      expect(conversations.length).toBeGreaterThan(0);
+
+      // user-1 rents rental-2 → other party is the owner (Sam Rivera)
+      const rental2 = conversations.find((c) => c.rentalId === 'rental-2');
+      expect(rental2).toBeDefined();
+      expect(rental2?.otherParty.fullName).toBe('Sam Rivera');
+      expect(rental2?.unreadCount).toBe(1); // msg-4 from Sam is unread
+      expect(rental2?.lastMessage?.body).toContain('Pickup is confirmed');
+
+      // Newest first
+      expect(conversations[0]?.rentalId).toBe('rental-2');
+    });
+
+    it('should return no conversations for a user without rentals', async () => {
+      const conversations = await repo.getConversations('user-999');
+      expect(conversations).toHaveLength(0);
+    });
   });
 
   describe('MockProfilesRepository', () => {

@@ -13,6 +13,16 @@ export function useRentalMessages(rentalId: string) {
   });
 }
 
+export function useConversations(userId: string) {
+  return useQuery({
+    queryKey: QUERY_KEYS.messages.conversations(userId),
+    queryFn: () => getRepositories().messages.getConversations(userId),
+    staleTime: QUERY_CONFIG.defaultStaleTime / 6, // Threads refresh more frequently
+    gcTime: QUERY_CONFIG.defaultGcTime,
+    enabled: Boolean(userId),
+  });
+}
+
 export function useSendMessage() {
   const queryClient = useQueryClient();
 
@@ -22,6 +32,10 @@ export function useSendMessage() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.messages.byRental(data.rentalId),
+      });
+      // Keep the Chat tab thread list in sync after a send (prefix match).
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.messages.conversationsAll,
       });
     },
   });

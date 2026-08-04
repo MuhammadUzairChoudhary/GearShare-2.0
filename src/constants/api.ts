@@ -35,6 +35,8 @@ export const QUERY_KEYS = {
   },
   messages: {
     byRental: (rentalId: string) => ['messages', rentalId] as const,
+    conversations: (userId: string) => ['messages', 'conversations', userId] as const,
+    conversationsAll: ['messages', 'conversations'] as const,
   },
   profile: {
     me: ['profile', 'me'] as const,

@@ -309,7 +309,7 @@ export default function RentalRequestScreen() {
           onPress={handleSubmit}
           variant="primary"
           fullWidth
-          size="lg"
+          size="large"
           disabled={!canSubmit}
           loading={createRental.isPending}
         />

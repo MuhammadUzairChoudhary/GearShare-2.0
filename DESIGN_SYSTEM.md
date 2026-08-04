@@ -52,35 +52,45 @@ Three font families:
 |---|---|
 | `AppText` | Typography with variant/color/align props |
 | `Screen` | Page layout with safe area and padding |
-| `AppButton` | Button with primary/secondary/ghost/danger variants |
-| `IconButton` | Icon-only touch target (min 44px) |
-| `TextInput` | Form input with label, error, hint states |
+| `AppButton` | Button system: primary/secondary/tertiary/destructive/ghost, small/medium/large, loading + disabled states |
+| `AlpinePressable` | Shared restrained pressable (scale ≤0.992, pressed styles, reduced-motion aware) |
+| `IconButton` | Icon-only touch target (min 44px, pressed state, hit slop) |
+| `TextInput` | Form input with label, required indicator, error, hint states |
 | `Card` | Container with pressable option |
-| `Chip` | Category/filter badge with variants |
+| `Chip` | Category/filter badge with variants and pressed/disabled states |
+| `ActivityChip` | Icon + label filter chip with selected state |
 | `Divider` | Horizontal separator |
 | `Avatar` | User avatar with image or initials |
 | `MoneyText` | Monetary display with accessibility |
 | `StatusBadge` | Status indicator with dot and label |
-| `StatusRail` | Rental lifecycle progress indicator |
+| `StatusRail` | Rental lifecycle progress indicator (animates on state change) |
 | `ListingCard` | Equipment listing card for discover feed |
 | `RentalCard` | Rental summary card with status |
-| `BottomSheet` | Modal bottom sheet shell |
+| `BottomSheet` | Modal bottom sheet with drag handle and controlled motion |
+| `AlpineDialog` | Destructive/short-choice confirmation modal: controlled backdrop, error palette, warning haptic |
+| `AlpineHeader` | Reusable header: back, title/subtitle, trailing actions, solid/over-image states |
+| `CustomTabBar` | Themed bottom tab bar with lime active rail, haptics, and badges |
 
 ## Interaction Rules
 
 - Only one Signal Lime primary action per screen
-- Touch targets minimum 44x44 px
-- Active feedback on press (opacity/highlight)
-- Loading states for async operations
-- Disabled states at 50% opacity
+- Touch targets minimum 44x44 px (buttons ≥52 px, icon buttons 44 px + hit slop)
+- Press feedback is immediate (80 ms): scale ≤0.992, background emphasis, no bounce
+- Disabled states use explicit muted palettes — never opacity alone
+- Loading keeps button size and label; duplicates are blocked
+- See `INTERACTION_SYSTEM.md` for the full behavioural spec
 
-## Motion Rules
+## Motion Tokens
 
-- Transitions: 200-300ms ease-out
-- Sheet presentation: slide up
-- Toast: fade in + slide up
-- Status changes: subtle transitions
-- Respect `prefers-reduced-motion`
+Centralized in `src/theme/motion.ts`:
+
+- Durations: instant 80 / fast 120 / standard 180 / deliberate 240 / completion 300 ms
+- Easing: standard `[0.2,0,0,1]`, enter `[0.16,1,0.3,1]`, exit `[0.4,0,1,1]` (RN `Easing.bezier`)
+- Press scale: 0.992 (cards), 0.985 (primary/destructive buttons), 1 px max translation
+- Sheet presentation: 240 ms slide + backdrop fade; reduced motion = instant
+- Toast: 180 ms enter / 120 ms exit, capped stack
+- Status changes: 240 ms linear fill, short settle, no pulse
+- Respect `prefers-reduced-motion` via `usePrefersReducedMotion()`
 
 ## Accessibility
 
@@ -89,6 +99,6 @@ Three font families:
 - Logical focus order
 - Dynamic font size compatibility
 - Sufficient color contrast (WCAG AA minimum)
-- Error messages not communicated by color alone
+- Error messages not communicated by color alone (status rail exposes a full description)
 - Accessible monetary descriptions
 - All components have `testID` for testing

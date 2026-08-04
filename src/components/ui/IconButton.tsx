@@ -1,25 +1,35 @@
 import React from 'react';
-import { TouchableOpacity, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../theme/ThemeContext';
-import { minTouchSize } from '../../theme/spacing';
+import { minTouchSize, radius, spacing } from '../../theme/spacing';
+import { AlpinePressable, type HapticFeedback } from './AlpinePressable';
+import type { ViewStyle } from 'react-native';
 
 interface IconButtonProps {
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
+  /** Icon size in px (default 24). */
   size?: number;
   color?: string;
   disabled?: boolean;
+  haptic?: HapticFeedback;
+  style?: ViewStyle;
   testID?: string;
   accessibilityLabel: string;
 }
 
+/**
+ * Icon-only touch target. Minimum 44×44 px, visible pressed state
+ * (subtle neutral surface), selection haptic, expanded hit slop.
+ */
 export function IconButton({
   icon,
   onPress,
   size = 24,
   color,
   disabled = false,
+  haptic = 'selection',
+  style,
   testID,
   accessibilityLabel,
 }: IconButtonProps) {
@@ -30,21 +40,27 @@ export function IconButton({
     justifyContent: 'center',
     minWidth: minTouchSize,
     minHeight: minTouchSize,
-    opacity: disabled ? 0.5 : 1,
+    borderRadius: radius.button,
+    padding: spacing.xs,
+    ...style,
   };
 
   return (
-    <TouchableOpacity
-      style={containerStyle}
+    <AlpinePressable
       onPress={onPress}
       disabled={disabled}
-      activeOpacity={0.7}
+      haptic={haptic}
+      style={containerStyle}
+      pressedStyle={{ backgroundColor: colors.surface }}
+      // Explicit muted surface (never opacity alone) — the icon itself also
+      // switches to textTertiary when disabled.
+      disabledStyle={{ backgroundColor: colors.titanium100 }}
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}
     >
-      <Ionicons name={icon} size={size} color={color ?? colors.textPrimary} />
-    </TouchableOpacity>
+      <Ionicons name={icon} size={size} color={disabled ? colors.textTertiary : (color ?? colors.textPrimary)} />
+    </AlpinePressable>
   );
 }

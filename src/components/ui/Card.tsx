@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, TouchableOpacity, type ViewStyle } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, radius } from '../../theme/spacing';
+import { AlpinePressable } from './AlpinePressable';
 
 interface CardProps {
   children: React.ReactNode;
@@ -20,6 +21,7 @@ export function Card({
   elevated = false,
   style,
   testID,
+  accessibilityLabel,
 }: CardProps) {
   const { colors } = useTheme();
 
@@ -44,15 +46,16 @@ export function Card({
 
   if (onPress) {
     return (
-      <TouchableOpacity
-        style={cardStyle}
+      <AlpinePressable
         onPress={onPress}
-        activeOpacity={0.8}
+        style={cardStyle}
+        pressedStyle={{ backgroundColor: colors.surface }}
         testID={testID}
         accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
       >
         {children}
-      </TouchableOpacity>
+      </AlpinePressable>
     );
   }
 

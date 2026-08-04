@@ -1,8 +1,9 @@
 import React from 'react';
-import { TouchableOpacity, Text, type ViewStyle } from 'react-native';
+import { View, Text, type ViewStyle } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { typography } from '../../theme/typography';
 import { spacing, radius, minTouchSize } from '../../theme/spacing';
+import { AlpinePressable } from './AlpinePressable';
 
 export type ChipVariant = 'default' | 'active' | 'accent';
 
@@ -14,28 +15,38 @@ interface ChipProps {
   testID?: string;
 }
 
+/**
+ * Category / filter chip.
+ *
+ * States:
+ * - default: neutral surface, graphite border
+ * - active:  lime fill, dark label (selected filter)
+ * - accent:  informational (verified owner, etc.)
+ * - pressed: background emphasis + 0.992 scale, selection haptic
+ * - disabled: muted palette (never opacity alone) and no press handler
+ */
 export function Chip({ label, onPress, variant = 'default', disabled = false, testID }: ChipProps) {
   const { colors } = useTheme();
 
-  const variants: Record<ChipVariant, ViewStyle> = {
+  const variants: Record<ChipVariant, { bg: string; border: string; text: string; pressedBg: string }> = {
     default: {
-      backgroundColor: colors.surface ?? colors.carbon850,
-      borderColor: colors.border ?? colors.graphite700,
+      bg: colors.surfaceElevated,
+      border: colors.graphite700,
+      text: colors.textPrimary,
+      pressedBg: colors.surface,
     },
     active: {
-      backgroundColor: colors.signalLime ?? '#C8FF3D',
-      borderColor: colors.signalLime ?? '#C8FF3D',
+      bg: colors.signalLime,
+      border: colors.signalLime,
+      text: colors.carbon950,
+      pressedBg: colors.signalLimeDark,
     },
     accent: {
-      backgroundColor: colors.informationBackground ?? '#13262D',
-      borderColor: colors.iceBlue ?? '#69C8E8',
+      bg: colors.informationBackground,
+      border: colors.iceBlue,
+      text: colors.iceBlue,
+      pressedBg: colors.carbon850,
     },
-  };
-
-  const textVariants: Record<ChipVariant, string> = {
-    default: colors.textSecondary ?? '#AEB4B7',
-    active: colors.carbon950 ?? '#0B0D0E',
-    accent: colors.iceBlue ?? '#69C8E8',
   };
 
   const chipStyle: ViewStyle = {
@@ -47,21 +58,50 @@ export function Chip({ label, onPress, variant = 'default', disabled = false, te
     borderRadius: radius.chip,
     borderWidth: 1,
     minHeight: minTouchSize,
-    opacity: disabled ? 0.5 : 1,
-    ...variants[variant],
+    backgroundColor: variants[variant].bg,
+    borderColor: variants[variant].border,
   };
 
+  const textStyle = {
+    ...typography.labelMedium,
+    color: disabled ? colors.textTertiary : variants[variant].text,
+  };
+
+  if (!onPress) {
+    return (
+      <View
+        style={[
+          chipStyle,
+          // Disabled uses an explicit muted palette — never opacity alone.
+          disabled && {
+            backgroundColor: colors.titanium100,
+            borderColor: colors.titanium100,
+          },
+        ]}
+        testID={testID}
+      >
+        <Text style={textStyle}>{label}</Text>
+      </View>
+    );
+  }
+
   return (
-    <TouchableOpacity
-      style={chipStyle}
+    <AlpinePressable
       onPress={onPress}
-      disabled={disabled || !onPress}
-      activeOpacity={0.7}
+      disabled={disabled}
+      haptic="selection"
+      style={chipStyle}
+      pressedStyle={{ backgroundColor: variants[variant].pressedBg, borderColor: variants[variant].border }}
+      disabledStyle={{
+        backgroundColor: colors.titanium100,
+        borderColor: colors.titanium100,
+      }}
       testID={testID}
-      accessibilityRole={onPress ? 'button' : 'text'}
+      accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled }}
     >
-      <Text style={[typography.labelMedium, { color: textVariants[variant] }]}>{label}</Text>
-    </TouchableOpacity>
+      <Text style={textStyle}>{label}</Text>
+    </AlpinePressable>
   );
 }
