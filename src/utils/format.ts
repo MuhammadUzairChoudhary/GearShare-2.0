@@ -36,6 +36,32 @@ export function formatTime(dateString: string): string {
   });
 }
 
+/**
+ * Day separator for conversation threads: "Today", "Yesterday",
+ * or a readable date ("Wed, Aug 5" — year added when it differs).
+ */
+export function formatDayDivider(dateString: string): string {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const that = new Date(date);
+  that.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.round((today.getTime() - that.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays <= 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+
+  const sameYear = date.getFullYear() === today.getFullYear();
+  return date.toLocaleDateString(
+    'en-US',
+    sameYear
+      ? { weekday: 'short', month: 'short', day: 'numeric' }
+      : { month: 'short', day: 'numeric', year: 'numeric' },
+  );
+}
+
 export function formatRelativeTime(dateString: string): string {
   const now = new Date();
   const date = new Date(dateString);
@@ -49,6 +75,39 @@ export function formatRelativeTime(dateString: string): string {
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays < 7) return `${diffDays}d ago`;
   return formatDate(dateString);
+}
+
+/**
+ * Presence readout for chat headers.
+ * - Active within 2 minutes → "Online"
+ * - Otherwise → "Last online · N min/hrs ago", "Yesterday", or a short date.
+ * Returns null when there is no presence data (subtitle is hidden).
+ * `now` is injectable for deterministic tests.
+ */
+export function formatPresence(
+  lastActiveAt: string | null | undefined,
+  now: number = Date.now(),
+): { label: string; isOnline: boolean } | null {
+  if (!lastActiveAt) return null;
+  const last = new Date(lastActiveAt).getTime();
+  if (Number.isNaN(last)) return null;
+
+  const diffMs = now - last;
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  if (diffMinutes < 2) return { label: 'Online', isOnline: true };
+  if (diffMinutes < 60) return { label: `Last online · ${diffMinutes} min ago`, isOnline: false };
+
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  if (diffHours < 24) return { label: `Last online · ${diffHours} hr ago`, isOnline: false };
+
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const that = new Date(last);
+  that.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((today.getTime() - that.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays === 1) return { label: 'Last online · Yesterday', isOnline: false };
+
+  return { label: `Last online · ${formatShortDate(lastActiveAt)}`, isOnline: false };
 }
 
 export function truncateText(text: string, maxLength: number): string {

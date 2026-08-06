@@ -45,6 +45,9 @@ export const QUERY_KEYS = {
   savedListings: {
     all: (userId: string) => ['savedListings', userId] as const,
   },
+  payments: {
+    methods: ['payments', 'methods'] as const,
+  },
 } as const;
 
 export const QUERY_CONFIG = {

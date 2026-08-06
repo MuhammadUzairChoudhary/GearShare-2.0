@@ -48,6 +48,35 @@ describe('Chip', () => {
     const { getByText } = renderWithTheme(<Chip label="Static" />);
     expect(getByText('Static')).toBeTruthy();
   });
+
+  it('should show the badge bubble when badgeCount is positive', () => {
+    const { getByText } = renderWithTheme(<Chip label="Archived" badgeCount={2} />);
+    expect(getByText('2')).toBeTruthy();
+  });
+
+  it('should hide the badge bubble when badgeCount is zero or absent', () => {
+    const { queryByText, rerender } = renderWithTheme(<Chip label="Archived" badgeCount={0} />);
+    expect(queryByText('0')).toBeNull();
+    rerender(
+      <ThemeProvider>
+        <Chip label="Archived" />
+      </ThemeProvider>,
+    );
+    expect(queryByText('0')).toBeNull();
+  });
+
+  it('should cap the badge at 9+ for large counts', () => {
+    const { getByText, queryByText } = renderWithTheme(<Chip label="Archived" badgeCount={12} />);
+    expect(getByText('9+')).toBeTruthy();
+    expect(queryByText('12')).toBeNull();
+  });
+
+  it('should announce the badge count in the accessibility label', () => {
+    const { getByRole } = renderWithTheme(
+      <Chip label="Archived" badgeCount={3} onPress={() => {}} />,
+    );
+    expect(getByRole('button', { name: 'Archived, 3 with new messages' })).toBeTruthy();
+  });
 });
 
 describe('ActivityChip', () => {

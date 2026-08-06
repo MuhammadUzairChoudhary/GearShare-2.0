@@ -1,10 +1,10 @@
 import React from 'react';
 import { View } from 'react-native';
-import { Stack, useLocalSearchParams, router } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../theme/ThemeContext';
 import { Screen } from '../../components/ui/Screen';
 import { AppText } from '../../components/ui/AppText';
-import { IconButton } from '../../components/ui/IconButton';
+import { BackButton } from '../../components/ui/BackButton';
 import { EmptyState } from '../../components/feedback/EmptyState';
 
 export default function IssueDetailScreen() {
@@ -19,13 +19,7 @@ export default function IssueDetailScreen() {
           headerTitle: `Issue ${issueId ? issueId.slice(0, 8) : ''}`,
           headerStyle: { backgroundColor: colors.background },
           headerTintColor: colors.textPrimary,
-          headerLeft: () => (
-            <IconButton
-              icon="arrow-back"
-              onPress={() => router.back()}
-              accessibilityLabel="Go back"
-            />
-          ),
+          headerLeft: () => <BackButton />,
         }}
       />
       <EmptyState

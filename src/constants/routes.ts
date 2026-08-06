@@ -17,6 +17,7 @@ export const ROUTES = {
   },
 
   // Detail routes
+  PROFILE: (id: string) => `/profile/${id}` as const,
   LISTING: (id: string) => `/listing/${id}` as const,
   RENTAL: (id: string) => `/rental/${id}` as const,
   ISSUE: (id: string) => `/issue/${id}` as const,

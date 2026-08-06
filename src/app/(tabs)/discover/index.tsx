@@ -6,7 +6,6 @@ import {
   Text,
   TextInput as RNTextInput,
   type ViewStyle,
-  type TextStyle,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +13,7 @@ import { AppIcon, type IconName } from '../../../components/ui/Icons';
 
 import { useTheme } from '../../../theme/ThemeContext';
 import { Screen } from '../../../components/ui/Screen';
+import { NotificationButton } from '../../../components/ui/NotificationButton';
 import { ListingCardSkeleton } from '../../../components/ui/ListingCardSkeleton';
 import { ErrorState } from '../../../components/feedback/ErrorState';
 import { EmptyState } from '../../../components/feedback/EmptyState';
@@ -125,10 +125,8 @@ export default function DiscoverScreen() {
   const secondaryText = isDark ? colors.textSecondary : figma.textSecondary;
   const borderColor = isDark ? colors.border : figma.border;
   const placeholderColor = isDark ? colors.textTertiary : figma.textPlaceholder;
-  const labelColor = isDark ? colors.textSecondary : figma.textLabel;
   const cardBg = isDark ? colors.surface : figma.surface;
   const heartColor = isDark ? colors.graphite500 : figma.heartGray;
-  const priceColor = isDark ? colors.textPrimary : figma.priceText;
   const promoBgColor = isDark ? colors.information : figma.promoBg;
 
   // ======= Compact Listing Card Renderer =======
@@ -352,20 +350,20 @@ export default function DiscoverScreen() {
     );
   }, [promoBgColor, colors, handleListGear]);
 
-  // ======= List Header =======
-  const ListHeader = useMemo(
+  // ======= Fixed Header (location + search — pinned, never scrolls) =======
+  const FixedHeader = useMemo(
     () => (
-      <View>
-        {/* ===== Header ===== */}
-        <View
-          style={{
-            paddingTop: spacing.sm,
-            paddingHorizontal: 20,
-            paddingBottom: spacing.lg,
-            gap: 20,
-            backgroundColor: bg,
-          }}
-        >
+      <View
+        style={{
+          paddingTop: spacing.xxl,
+          paddingHorizontal: 20,
+          // 4px here + the 12px top padding of the activity-chip strip = 16px,
+          // matching the gap between search and filters in the Chat tab.
+          paddingBottom: spacing.xs,
+          gap: 20,
+          backgroundColor: bg,
+        }}
+      >
           {/* Top row: Location + Notification */}
           <View
             style={{
@@ -412,37 +410,7 @@ export default function DiscoverScreen() {
             </View>
 
             {/* Notification bell */}
-            <TouchableOpacity
-              onPress={() => {}}
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 10,
-                borderWidth: 1,
-                borderColor: borderColor,
-                backgroundColor: isDark ? colors.surface : figma.white,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Notifications"
-            >
-              <AppIcon name="notification" size={16} color={textColor} />
-              {/* Red dot */}
-              <View
-                style={{
-                  position: 'absolute',
-                  width: 8,
-                  height: 8,
-                  borderRadius: 9999,
-                  backgroundColor: figma.dotRed,
-                  borderWidth: 1,
-                  borderColor: figma.surface,
-                  right: 9,
-                  top: 9,
-                }}
-              />
-            </TouchableOpacity>
+            <NotificationButton />
           </View>
 
           {/* Search bar */}
@@ -482,8 +450,18 @@ export default function DiscoverScreen() {
               accessibilityRole="search"
             />
           </View>
-        </View>
+      </View>
+    ),
+    [
+      bg, textColor, secondaryText, borderColor, placeholderColor, isDark, colors,
+      query, setQuery, handleSearch,
+    ],
+  );
 
+  // ======= Scrolling content (activity chips + sections) =======
+  const ScrollContent = useMemo(
+    () => (
+      <View>
         {/* ===== Activity Chips ===== */}
         <View
           style={{
@@ -610,22 +588,20 @@ export default function DiscoverScreen() {
       </View>
     ),
     [
-      bg, textColor, secondaryText, borderColor, placeholderColor, labelColor, cardBg,
-      heartColor, priceColor, promoBgColor, isDark, colors, isAuthenticated,
-      query, setQuery, selectedActivity, handleSearch, handleActivityPress,
-      isLoading, isError, displayListings, refetch,
-      renderCompactCard, renderPromoCard,
-      handleListGear, setCategory,
+      textColor, secondaryText, borderColor, isDark, colors, selectedActivity,
+      handleActivityPress, isLoading, isError, displayListings, refetch,
+      renderCompactCard, renderPromoCard, setCategory,
     ],
   );
 
   return (
     <Screen safeArea padded={false} scrollable={false}>
+      {FixedHeader}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: spacing.xxl }}
       >
-        {ListHeader}
+        {ScrollContent}
       </ScrollView>
     </Screen>
   );

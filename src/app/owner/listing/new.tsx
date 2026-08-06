@@ -1,11 +1,11 @@
 import React from 'react';
 import { View, ScrollView } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useTheme } from '../../../theme/ThemeContext';
 import { Screen } from '../../../components/ui/Screen';
 import { AppText } from '../../../components/ui/AppText';
 import { AppButton } from '../../../components/ui/AppButton';
-import { IconButton } from '../../../components/ui/IconButton';
+import { BackButton } from '../../../components/ui/BackButton';
 import { spacing } from '../../../theme/spacing';
 
 export default function NewListingScreen() {
@@ -19,13 +19,7 @@ export default function NewListingScreen() {
           headerTitle: 'New Listing',
           headerStyle: { backgroundColor: colors.background },
           headerTintColor: colors.textPrimary,
-          headerLeft: () => (
-            <IconButton
-              icon="arrow-back"
-              onPress={() => router.back()}
-              accessibilityLabel="Go back"
-            />
-          ),
+          headerLeft: () => <BackButton />,
         }}
       />
       <ScrollView contentContainerStyle={{ gap: spacing.xxl, paddingBottom: spacing.xxxxl }}>

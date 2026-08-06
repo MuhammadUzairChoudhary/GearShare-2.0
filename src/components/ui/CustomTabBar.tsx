@@ -7,6 +7,9 @@ import { rf } from '../../theme/responsiveFont';
 import { useTheme } from '../../theme/ThemeContext';
 import { haptics } from '../../services/feedback/haptics';
 
+/** Matches the notification-bell red dot and the unread bubble on chat cards. */
+const UNREAD_RED = '#EF4444';
+
 export type TabKey = 'discover' | 'rentals' | 'inbox' | 'account';
 
 const TAB_CONFIG: { key: TabKey; label: string; icon: IconName; badgeNoun: string }[] = [
@@ -35,7 +38,9 @@ export function CustomTabBar({ state, descriptors, navigation, insets, badgeCoun
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 24,
+        // Minimal side padding so the four tabs spread evenly across the full
+        // width instead of bunching toward the centre with dead edge space.
+        paddingHorizontal: 8,
         height: 80 + (insets?.bottom ?? 0),
         paddingBottom: insets?.bottom ?? 0,
         backgroundColor: colors.white,
@@ -119,13 +124,16 @@ export function CustomTabBar({ state, descriptors, navigation, insets, badgeCoun
                 <View
                   style={{
                     position: 'absolute',
+                    // Tucked into the icon's top-right corner, matching the
+                    // notification bell's dot (which protrudes ~3px past the
+                    // icon edges).
                     top: -3,
-                    right: -8,
+                    right: -3,
                     minWidth: 16,
                     height: 16,
                     paddingHorizontal: 4,
                     borderRadius: 8,
-                    backgroundColor: colors.error,
+                    backgroundColor: UNREAD_RED,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}

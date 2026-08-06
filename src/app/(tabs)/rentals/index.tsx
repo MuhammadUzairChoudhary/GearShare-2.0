@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthContext } from '../../../features/auth/AuthProvider';
 import { Screen } from '../../../components/ui/Screen';
+import { NotificationButton } from '../../../components/ui/NotificationButton';
 import { AppText } from '../../../components/ui/AppText';
 import { AppButton } from '../../../components/ui/AppButton';
 import { RentalSummaryCard } from '../../../components/ui/RentalSummaryCard';
@@ -155,11 +156,21 @@ export default function RentalsScreen() {
   return (
     <Screen>
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <View style={{ paddingTop: spacing.xxl, gap: spacing.xs }}>
-        <Text style={[typeScale.h1, { color: colors.textPrimary }]}>My Rentals</Text>
-        <Text style={[typeScale.monoSmall, { color: colors.textSecondary }]}>
-          {upcomingRentals.length} upcoming · {pastRentals.length} past
-        </Text>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          paddingTop: spacing.xxl,
+        }}
+      >
+        <View style={{ gap: spacing.xs, flex: 1 }}>
+          <Text style={[typeScale.h1, { color: colors.textPrimary }]}>My Rentals</Text>
+          <Text style={[typeScale.monoSmall, { color: colors.textSecondary }]}>
+            {upcomingRentals.length} upcoming · {pastRentals.length} past
+          </Text>
+        </View>
+        <NotificationButton />
       </View>
 
       {/* ── Needs-attention strip — explicit, actionable, never decorative ── */}

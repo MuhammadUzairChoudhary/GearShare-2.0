@@ -7,6 +7,8 @@ export interface ListingsRepository {
   searchListings(input: ListingSearchInput): Promise<Listing[]>;
   getListingById(id: string): Promise<Listing | null>;
   getMapListings(input: ListingSearchInput): Promise<ListingMapItem[]>;
+  getListingsByOwner(ownerId: string): Promise<Listing[]>;
+  getSavedListings(userId: string): Promise<Listing[]>;
 }
 
 export class MockListingsRepository implements ListingsRepository {
@@ -116,6 +118,19 @@ export class MockListingsRepository implements ListingsRepository {
     return mockListings.find((l) => l.id === id) ?? null;
   }
 
+  async getListingsByOwner(ownerId: string): Promise<Listing[]> {
+    return mockListings.filter(
+      (l) => l.ownerId === ownerId && l.publishedStatus === 'published' && l.deletedAt === null,
+    );
+  }
+
+  async getSavedListings(_userId: string): Promise<Listing[]> {
+    // Deterministic mock wishlist: always the same two saved listings.
+    return mockListings.filter(
+      (l) => l.id === 'listing-4' || l.id === 'listing-7',
+    );
+  }
+
   async getMapListings(input: ListingSearchInput): Promise<ListingMapItem[]> {
     const results = await this.searchListings(input);
     return results
@@ -150,6 +165,14 @@ export class SupabaseListingsRepository implements ListingsRepository {
   }
 
   async getMapListings(_input: ListingSearchInput): Promise<ListingMapItem[]> {
+    throw new Error('Not implemented. Connect Supabase when ready.');
+  }
+
+  async getListingsByOwner(_ownerId: string): Promise<Listing[]> {
+    throw new Error('Not implemented. Connect Supabase when ready.');
+  }
+
+  async getSavedListings(_userId: string): Promise<Listing[]> {
     throw new Error('Not implemented. Connect Supabase when ready.');
   }
 }

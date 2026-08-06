@@ -11,7 +11,11 @@ export default function TabLayout() {
     isAuthenticated ? (user?.id ?? '') : '',
   );
   const unreadMessages = useMemo(
-    () => (conversations ?? []).reduce((sum, c) => sum + c.unreadCount, 0),
+    // Archived conversations are hidden from All — they don't count toward the badge.
+    () =>
+      (conversations ?? [])
+        .filter((c) => !c.archived)
+        .reduce((sum, c) => sum + c.unreadCount, 0),
     [conversations],
   );
 

@@ -16,6 +16,7 @@ describe('Verification Policy', () => {
     verificationStatus: 'unverified',
     ratingAverage: null,
     ratingCount: 0,
+    lastActiveAt: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

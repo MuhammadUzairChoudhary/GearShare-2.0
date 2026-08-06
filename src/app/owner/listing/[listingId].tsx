@@ -1,9 +1,9 @@
 import React from 'react';
-import { Stack, useLocalSearchParams, router } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../../theme/ThemeContext';
 import { Screen } from '../../../components/ui/Screen';
 import { AppText } from '../../../components/ui/AppText';
-import { IconButton } from '../../../components/ui/IconButton';
+import { BackButton } from '../../../components/ui/BackButton';
 import { EmptyState } from '../../../components/feedback/EmptyState';
 
 export default function EditListingScreen() {
@@ -18,13 +18,7 @@ export default function EditListingScreen() {
           headerTitle: 'Edit Listing',
           headerStyle: { backgroundColor: colors.background },
           headerTintColor: colors.textPrimary,
-          headerLeft: () => (
-            <IconButton
-              icon="arrow-back"
-              onPress={() => router.back()}
-              accessibilityLabel="Go back"
-            />
-          ),
+          headerLeft: () => <BackButton />,
         }}
       />
       <EmptyState

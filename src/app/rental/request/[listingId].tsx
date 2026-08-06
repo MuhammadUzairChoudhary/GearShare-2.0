@@ -6,7 +6,7 @@ import { Screen } from '../../../components/ui/Screen';
 import { AppText } from '../../../components/ui/AppText';
 import { AppButton } from '../../../components/ui/AppButton';
 import { TextInput } from '../../../components/ui/TextInput';
-import { IconButton } from '../../../components/ui/IconButton';
+import { BackButton } from '../../../components/ui/BackButton';
 import { Card } from '../../../components/ui/Card';
 import { Divider } from '../../../components/ui/Divider';
 import { PriceBreakdown } from '../../../components/ui/PriceBreakdown';
@@ -147,13 +147,7 @@ export default function RentalRequestScreen() {
             headerTitle: 'Rental Request',
             headerStyle: { backgroundColor: colors.background },
             headerTintColor: colors.textPrimary,
-            headerLeft: () => (
-              <IconButton
-                icon="arrow-back"
-                onPress={() => router.back()}
-                accessibilityLabel="Go back"
-              />
-            ),
+            headerLeft: () => <BackButton />,
           }}
         />
         <ErrorState onRetry={() => refetch()} />
@@ -171,13 +165,7 @@ export default function RentalRequestScreen() {
           headerTitle: 'Rental Request',
           headerStyle: { backgroundColor: colors.background },
           headerTintColor: colors.textPrimary,
-          headerLeft: () => (
-            <IconButton
-              icon="arrow-back"
-              onPress={() => router.back()}
-              accessibilityLabel="Go back"
-            />
-          ),
+          headerLeft: () => <BackButton />,
         }}
       />
       <ScrollView contentContainerStyle={{ paddingBottom: spacing.xxxxl, gap: spacing.xxl }}>

@@ -269,6 +269,20 @@ jest.mock('@expo/vector-icons', () => {
   return { Ionicons: MockIcon, MaterialIcons: MockIcon, Feather: MockIcon };
 });
 
+// SvgXml powers the custom Alpine icon set (AppIcon).
+jest.mock('react-native-svg', () => {
+  const React = require('react');
+  const SvgXml = (props: any) => React.createElement('SvgXml', props);
+  const Svg = (props: any) => React.createElement('Svg', props);
+  const Path = (props: any) => React.createElement('Path', props);
+  const Circle = (props: any) => React.createElement('Circle', props);
+  const Rect = (props: any) => React.createElement('Rect', props);
+  const Line = (props: any) => React.createElement('Line', props);
+  const Polyline = (props: any) => React.createElement('Polyline', props);
+  const G = (props: any) => React.createElement('G', props);
+  return { SvgXml, Svg, Path, Circle, Rect, Line, Polyline, G };
+});
+
 // ==============================
 // 4b. Expo Haptics Mock
 // ==============================

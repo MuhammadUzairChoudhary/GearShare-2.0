@@ -105,6 +105,20 @@ const ICON_INFO = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" x
 <path d="M5 0C2.2375 0 0 2.2375 0 5C0 7.7625 2.2375 10 5 10C7.7625 10 10 7.7625 10 5C10 2.2375 7.7625 0 5 0ZM5.5 7.5H4.5V4.5H5.5V7.5ZM5.5 3.5H4.5V2.5H5.5V3.5Z" fill="FILL_COLOR"/>
 </svg>`;
 
+// ── Header Action Icons ───────────────────────────────────────────────────
+
+// Heavier filled handset for the chat header call button.
+const ICON_CALL = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" fill="FILL_COLOR"/>
+</svg>`;
+
+// Heavier vertical 3-dot menu (fatter dots than the Ionicons glyph).
+const ICON_DOTS_VERTICAL = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<circle cx="8" cy="4" r="2" fill="FILL_COLOR"/>
+<circle cx="8" cy="8" r="2" fill="FILL_COLOR"/>
+<circle cx="8" cy="12" r="2" fill="FILL_COLOR"/>
+</svg>`;
+
 // ── Icon Registry ─────────────────────────────────────────────────────────
 
 const ICON_REGISTRY = {
@@ -133,6 +147,8 @@ const ICON_REGISTRY = {
   'chevron-right': ICON_CHEVRON_RIGHT,
   flash: ICON_FLASH,
   info: ICON_INFO,
+  call: ICON_CALL,
+  'dots-vertical': ICON_DOTS_VERTICAL,
 };
 
 export type IconName = keyof typeof ICON_REGISTRY;

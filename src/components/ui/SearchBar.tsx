@@ -10,6 +10,8 @@ interface SearchBarProps {
   onChangeText: (text: string) => void;
   onSubmit?: () => void;
   placeholder?: string;
+  /** Screen-reader label; defaults to the gear-listings label. */
+  accessibilityLabel?: string;
   testID?: string;
 }
 
@@ -18,32 +20,38 @@ export function SearchBar({
   onChangeText,
   onSubmit,
   placeholder = 'Search gear, brands, categories…',
+  accessibilityLabel = 'Search gear listings',
   testID,
 }: SearchBarProps) {
   const { colors } = useTheme();
 
+  // Same visual language as the dashboard/search bars: white surface,
+  // hairline border, radius 10, 40px height.
   const containerStyle: ViewStyle = {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.input,
+    backgroundColor: colors.background,
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    height: 48,
-    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    height: 40,
+    gap: spacing.md,
   };
 
   return (
     <View style={containerStyle} testID={testID}>
-      <Ionicons name="search-outline" size={20} color={colors.graphite500} />
+      <Ionicons name="search-outline" size={14} color={colors.graphite500} />
       <TextInput
         style={[
-          typography.bodyLarge,
           {
             flex: 1,
+            fontFamily: typography.bodyLarge.fontFamily,
+            fontSize: typography.bodyLarge.fontSize,
+            lineHeight: typography.bodyLarge.lineHeight,
             color: colors.textPrimary,
-            height: '100%',
+            padding: 0,
+            margin: 0,
           },
         ]}
         value={value}
@@ -54,7 +62,7 @@ export function SearchBar({
         returnKeyType="search"
         autoCapitalize="none"
         autoCorrect={false}
-        accessibilityLabel="Search gear listings"
+        accessibilityLabel={accessibilityLabel}
         accessibilityRole="search"
       />
       {value.length > 0 && (

@@ -8,6 +8,7 @@ import { fontFamilies } from '../../theme/typography';
 import { spacing, radius } from '../../theme/spacing';
 import { rf } from '../../theme/responsiveFont';
 import { AppText } from '../../components/ui/AppText';
+import { BackButton } from '../../components/ui/BackButton';
 import { ListingCardSkeleton } from '../../components/ui/ListingCardSkeleton';
 import { FilterSheet, type FilterState } from '../../components/ui/FilterSheet';
 import type { BottomSheetRef } from '../../components/ui';
@@ -278,22 +279,7 @@ export default function SearchResultsScreen() {
           }}
         >
           {/* Back button */}
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={{
-              width: 40,
-              height: 40,
-              backgroundColor: colors.background,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 10,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            accessibilityLabel="Go back"
-          >
-            <AppIcon name="back" size={14} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <BackButton />
 
           {/* Search bar */}
           <View

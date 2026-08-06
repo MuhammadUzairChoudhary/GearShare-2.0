@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Screen } from '../../components/ui/Screen';
+import { BackButton } from '../../components/ui/BackButton';
 import { useAuthContext } from '../../features/auth/AuthProvider';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, radius } from '../../theme/spacing';
@@ -152,27 +153,7 @@ export default function SignInScreen() {
               paddingBottom: spacing.lg,
             }}
           >
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 10,
-                borderWidth: 1,
-                borderColor: effectiveBorderColor,
-                backgroundColor: isDark ? colors.surface : colors.white,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-            >
-              <Ionicons
-                name="arrow-back"
-                size={16}
-                color={effectiveTextColor}
-              />
-            </TouchableOpacity>
+            <BackButton />
           </View>
 
           {/* ===== Heading Area ===== */}

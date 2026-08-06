@@ -34,6 +34,24 @@ describe('Mock Repositories', () => {
       const results = await repo.searchListings({ activity: 'camping' });
       expect(results.length).toBeGreaterThan(0);
     });
+
+    it('should return published listings by owner', async () => {
+      const listings = await repo.getListingsByOwner('user-1');
+      expect(listings.length).toBeGreaterThan(0);
+      expect(listings.every((l) => l.ownerId === 'user-1')).toBe(true);
+      expect(listings.every((l) => l.publishedStatus === 'published')).toBe(true);
+    });
+
+    it('should return empty list for owner without listings', async () => {
+      const listings = await repo.getListingsByOwner('user-2');
+      expect(listings).toHaveLength(0);
+    });
+
+    it('should return saved listings for the user', async () => {
+      const saved = await repo.getSavedListings('user-1');
+      expect(saved.length).toBeGreaterThan(0);
+      expect(saved.every((l) => l.publishedStatus === 'published')).toBe(true);
+    });
   });
 
   describe('MockRentalsRepository', () => {
@@ -81,7 +99,10 @@ describe('Mock Repositories', () => {
     });
 
     it('should return conversations with the counterparty and unread counts', async () => {
-      const conversations = await repo.getConversations('user-1');
+      // Fresh repo: the sendMessage test above mutates shared state (newest
+      // message on rental-1), which would otherwise break newest-first ordering.
+      const freshRepo = new MockMessagesRepository();
+      const conversations = await freshRepo.getConversations('user-1');
       expect(conversations.length).toBeGreaterThan(0);
 
       // user-1 rents rental-2 → other party is the owner (Sam Rivera)
@@ -98,6 +119,48 @@ describe('Mock Repositories', () => {
     it('should return no conversations for a user without rentals', async () => {
       const conversations = await repo.getConversations('user-999');
       expect(conversations).toHaveLength(0);
+    });
+
+    it('should archive conversations (flagged for the Archived tab)', async () => {
+      const freshRepo = new MockMessagesRepository();
+      await freshRepo.archiveConversations(['rental-2']);
+      const conversations = await freshRepo.getConversations('user-1');
+      const rental2 = conversations.find((c) => c.rentalId === 'rental-2');
+      expect(rental2).toBeDefined();
+      expect(rental2?.archived).toBe(true);
+    });
+
+    it('should delete conversations entirely', async () => {
+      const freshRepo = new MockMessagesRepository();
+      await freshRepo.deleteConversations(['rental-2']);
+      const conversations = await freshRepo.getConversations('user-1');
+      expect(conversations.find((c) => c.rentalId === 'rental-2')).toBeUndefined();
+    });
+
+    it('should mark conversations as unread', async () => {
+      const freshRepo = new MockMessagesRepository();
+      const before = await freshRepo.getConversations('user-1');
+      expect(before.find((c) => c.rentalId === 'rental-1')?.unreadCount).toBe(0);
+      await freshRepo.markConversationsUnread(['rental-1'], 'user-1');
+      const after = await freshRepo.getConversations('user-1');
+      expect(after.find((c) => c.rentalId === 'rental-1')?.unreadCount).toBeGreaterThan(0);
+    });
+
+    it('should unarchive conversations back into All/Unread', async () => {
+      const freshRepo = new MockMessagesRepository();
+      await freshRepo.archiveConversations(['rental-2']);
+      await freshRepo.unarchiveConversations(['rental-2']);
+      const conversations = await freshRepo.getConversations('user-1');
+      expect(conversations.find((c) => c.rentalId === 'rental-2')?.archived).toBe(false);
+    });
+
+    it('should mark conversations as read', async () => {
+      const freshRepo = new MockMessagesRepository();
+      const before = await freshRepo.getConversations('user-1');
+      expect(before.find((c) => c.rentalId === 'rental-2')?.unreadCount).toBeGreaterThan(0);
+      await freshRepo.markConversationsRead(['rental-2'], 'user-1');
+      const after = await freshRepo.getConversations('user-1');
+      expect(after.find((c) => c.rentalId === 'rental-2')?.unreadCount).toBe(0);
     });
   });
 

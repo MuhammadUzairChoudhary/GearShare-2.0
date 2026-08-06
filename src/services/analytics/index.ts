@@ -25,6 +25,9 @@ export type AnalyticsEvent =
   | { name: 'rental_request_failed'; params?: { listingId: string; reason: string } }
   | { name: 'request_sent_viewed'; params?: { rentalId: string } }
   | { name: 'rentals_viewed'; params?: { filter: 'all' | 'upcoming' | 'past' } }
+  | { name: 'inbox_tab_changed'; params?: { tab: 'all' | 'updates' | 'archived' } }
+  | { name: 'profile_viewed' }
+  | { name: 'profile_mode_toggled'; params?: { mode: 'hosting' | 'renting' } }
   | { name: 'authentication_required'; params?: { intent: string } }
   | { name: 'verification_required'; params?: { reason: string } }
   // General
@@ -43,7 +46,8 @@ export interface AnalyticsService {
 class MockAnalyticsService implements AnalyticsService {
   trackEvent(event: AnalyticsEvent): void {
     if (__DEV__) {
-      console.log(`[Analytics] ${event.name}`, JSON.stringify(event.params ?? {}));
+      const params = 'params' in event ? event.params : undefined;
+      console.log(`[Analytics] ${event.name}`, JSON.stringify(params ?? {}));
     }
   }
 

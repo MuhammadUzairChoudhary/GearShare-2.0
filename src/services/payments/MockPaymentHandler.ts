@@ -1,6 +1,7 @@
 import type {
   PaymentHandler,
   PaymentIntent,
+  PaymentMethod,
   CreatePaymentIntentInput,
   ConfirmPaymentInput,
   RefundInput,
@@ -66,5 +67,19 @@ export class MockPaymentHandler implements PaymentHandler {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+  }
+
+  async getPaymentMethods(): Promise<PaymentMethod[]> {
+    return [
+      {
+        id: 'pm_mock_default',
+        provider: 'mock',
+        type: 'card',
+        lastFour: '4242',
+        expiryMonth: 8,
+        expiryYear: 2028,
+        isDefault: true,
+      },
+    ];
   }
 }

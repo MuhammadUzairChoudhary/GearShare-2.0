@@ -3,6 +3,7 @@ import { View, Animated, TouchableOpacity, Text, StatusBar, Dimensions } from 'r
 import { Stack, useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppIcon } from '../../components/ui/Icons';
+import { BackButton } from '../../components/ui/BackButton';
 import { useTheme } from '../../theme/ThemeContext';
 import { fontFamilies } from '../../theme/typography';
 import { spacing, radius } from '../../theme/spacing';
@@ -105,11 +106,7 @@ export default function ListingDetailScreen() {
             headerTitle: 'Listing',
             headerStyle: { backgroundColor: colors.background },
             headerTintColor: colors.textPrimary,
-            headerLeft: () => (
-              <TouchableOpacity onPress={() => router.back()} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
-                <AppIcon name="back" size={20} color={colors.textPrimary} />
-              </TouchableOpacity>
-            ),
+            headerLeft: () => <BackButton />,
           }}
         />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg, padding: spacing.xl }}>
@@ -144,14 +141,8 @@ export default function ListingDetailScreen() {
 
       {/* ── Fixed header overlay (back, share, save, collapsed title) ── */}
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: 48, paddingBottom: 16 }}>
-        {/* Back button */}
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={{ width: 40, height: 40, backgroundColor: 'rgba(255,255,255,0.9)', borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}
-          accessibilityLabel="Go back"
-        >
-          <AppIcon name="back" size={14} color="#1F2225" />
-        </TouchableOpacity>
+        {/* Back button — translucent over the photo, like the share/save actions */}
+        <BackButton overContent />
 
         {/* Collapsed title (appears on scroll) — vertically centered with icons */}
         <Animated.View style={{ position: 'absolute', left: 76, right: 116, top: 48, bottom: 16, opacity: collapsedTitleOpacity, justifyContent: 'center', alignItems: 'center' }}>

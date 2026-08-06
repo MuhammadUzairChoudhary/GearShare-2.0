@@ -40,3 +40,31 @@ export function useSendMessage() {
     },
   });
 }
+
+export type ConversationAction = 'archive' | 'unarchive' | 'delete' | 'unread' | 'read';
+
+export function useConversationActions() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      action,
+      rentalIds,
+      userId,
+    }: {
+      action: ConversationAction;
+      rentalIds: string[];
+      userId: string;
+    }) => {
+      const repo = getRepositories().messages;
+      if (action === 'archive') return repo.archiveConversations(rentalIds);
+      if (action === 'unarchive') return repo.unarchiveConversations(rentalIds);
+      if (action === 'delete') return repo.deleteConversations(rentalIds);
+      if (action === 'read') return repo.markConversationsRead(rentalIds, userId);
+      return repo.markConversationsUnread(rentalIds, userId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.messages.conversationsAll });
+    },
+  });
+}

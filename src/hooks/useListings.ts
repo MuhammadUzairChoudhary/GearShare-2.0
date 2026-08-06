@@ -35,6 +35,26 @@ export function useListing(id: string) {
   });
 }
 
+export function useOwnerListings(ownerId: string) {
+  return useQuery({
+    queryKey: QUERY_KEYS.listings.byOwner(ownerId),
+    queryFn: () => getRepositories().listings.getListingsByOwner(ownerId),
+    staleTime: QUERY_CONFIG.defaultStaleTime,
+    gcTime: QUERY_CONFIG.defaultGcTime,
+    enabled: Boolean(ownerId),
+  });
+}
+
+export function useSavedListings(userId: string) {
+  return useQuery({
+    queryKey: QUERY_KEYS.savedListings.all(userId),
+    queryFn: () => getRepositories().listings.getSavedListings(userId),
+    staleTime: QUERY_CONFIG.defaultStaleTime,
+    gcTime: QUERY_CONFIG.defaultGcTime,
+    enabled: Boolean(userId),
+  });
+}
+
 export function useMapListings(input: ListingSearchInput) {
   return useQuery({
     queryKey: QUERY_KEYS.listings.search({ ...input, map: true } as Record<string, unknown>),

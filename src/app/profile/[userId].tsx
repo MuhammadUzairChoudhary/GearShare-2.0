@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, ScrollView } from 'react-native';
-import { Stack, useLocalSearchParams, router } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../theme/ThemeContext';
 import { Screen } from '../../components/ui/Screen';
-import { IconButton } from '../../components/ui/IconButton';
+import { BackButton } from '../../components/ui/BackButton';
 import { OwnerSummaryCard } from '../../components/ui/OwnerSummaryCard';
 import { Divider } from '../../components/ui/Divider';
 import { AppText } from '../../components/ui/AppText';
@@ -29,22 +29,13 @@ export default function ProfileScreen() {
             headerTitle: 'Profile',
             headerStyle: { backgroundColor: colors.background },
             headerTintColor: colors.textPrimary,
-            headerLeft: () => (
-              <IconButton
-                icon="arrow-back"
-                onPress={() => router.back()}
-                accessibilityLabel="Go back"
-              />
-            ),
+            headerLeft: () => <BackButton />,
           }}
         />
         <EmptyState icon="person-outline" title="User not found" />
       </Screen>
     );
   }
-
-  const reviewCount = profile.ratingCount;
-  const avgRating = profile.ratingAverage;
 
   return (
     <Screen>
@@ -54,13 +45,7 @@ export default function ProfileScreen() {
           headerTitle: profile.fullName,
           headerStyle: { backgroundColor: colors.background },
           headerTintColor: colors.textPrimary,
-          headerLeft: () => (
-            <IconButton
-              icon="arrow-back"
-              onPress={() => router.back()}
-              accessibilityLabel="Go back"
-            />
-          ),
+          headerLeft: () => <BackButton />,
         }}
       />
       <ScrollView contentContainerStyle={{ paddingBottom: spacing.xxxxl, gap: spacing.xxl }}>

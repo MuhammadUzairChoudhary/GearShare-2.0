@@ -28,6 +28,14 @@ interface AlpinePressableProps {
   accessibilityLabel?: string;
   accessibilityHint?: string;
   accessibilityState?: PressableProps['accessibilityState'];
+  /** Layout callback forwarded to the Pressable (e.g. measuring a menu anchor). */
+  onLayout?: PressableProps['onLayout'];
+  /**
+   * Callback with the underlying host node once mounted — for imperative
+   * measurements (measureInWindow etc.) that need a native ref. Avoid unless
+   * you truly need native measurements.
+   */
+  onRef?: (node: unknown) => void;
   testID?: string;
   /** Maps to hitSlop presets (sm/md/lg) to expand the touch target. */
   hitSlopSize?: keyof typeof hitSlop;
@@ -35,6 +43,16 @@ interface AlpinePressableProps {
   pressedScale?: number;
 }
 
+/**
+ * The restrained pressable primitive for the Alpine Instrument system.
+ *
+ * Behaviour:
+ * - Scale compresses to pressedScale (0.992 max) for 80 ms, restores in 120 ms.
+ * - Optional background/border emphasis via `pressedStyle`.
+ * - Maximum translation is 1 px — no elevation, no bounce, no glow.
+ * - Skipped entirely when the OS reports "reduce motion".
+ * - Disabled controls never receive press handlers or haptics.
+ */
 /**
  * The restrained pressable primitive for the Alpine Instrument system.
  *
@@ -58,6 +76,8 @@ export function AlpinePressable({
   accessibilityLabel,
   accessibilityHint,
   accessibilityState,
+  onLayout,
+  onRef,
   testID,
   hitSlopSize,
   pressedScale = pressMotion.pressedScale,
@@ -89,6 +109,7 @@ export function AlpinePressable({
 
   return (
     <Pressable
+      ref={onRef}
       onPress={disabled ? undefined : onPress}
       onLongPress={disabled ? undefined : onLongPress}
       onPressIn={disabled ? undefined : handlePressIn}
@@ -104,6 +125,7 @@ export function AlpinePressable({
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled, ...accessibilityState }}
+      onLayout={onLayout}
       testID={testID}
     >
       <Animated.View style={{ transform: [{ scale }] }}>{children}</Animated.View>

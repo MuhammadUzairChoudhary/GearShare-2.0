@@ -5,10 +5,11 @@ import { typography } from '../../theme/typography';
 
 export type AvatarSize = 'sm' | 'md' | 'lg' | 'xl';
 
-interface AvatarProps {
+export interface AvatarProps {
   uri?: string | null;
   name?: string;
-  size?: AvatarSize;
+  /** Named preset or an exact pixel size (e.g. 48). */
+  size?: AvatarSize | number;
   testID?: string;
   accessibilityLabel?: string;
 }
@@ -22,7 +23,7 @@ const AVATAR_DIMENSIONS: Record<AvatarSize, number> = {
 
 export function Avatar({ uri, name, size = 'md', testID, accessibilityLabel }: AvatarProps) {
   const { colors } = useTheme();
-  const dimension = AVATAR_DIMENSIONS[size];
+  const dimension = typeof size === 'number' ? size : AVATAR_DIMENSIONS[size];
   const borderRadius = dimension / 2;
 
   const initials = name

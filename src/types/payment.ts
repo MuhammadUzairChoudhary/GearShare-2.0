@@ -52,4 +52,5 @@ export interface PaymentHandler {
   confirmPayment(input: ConfirmPaymentInput): Promise<PaymentIntent>;
   refund(input: RefundInput): Promise<PaymentIntent>;
   getPaymentIntent(id: string): Promise<PaymentIntent | null>;
+  getPaymentMethods(): Promise<PaymentMethod[]>;
 }

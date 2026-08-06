@@ -68,7 +68,8 @@ Three font families:
 | `RentalCard` | Rental summary card with status |
 | `BottomSheet` | Modal bottom sheet with drag handle and controlled motion |
 | `AlpineDialog` | Destructive/short-choice confirmation modal: controlled backdrop, error palette, warning haptic |
-| `AlpineHeader` | Reusable header: back, title/subtitle, trailing actions, solid/over-image states |
+| `BackButton` | Standard back button — three surface modes: solid + hairline (theme background), `bare` (flat non-white surfaces: no stroke, no fill), `overContent` (translucent over imagery) |
+| `AlpineHeader` | Reusable header: back, title/subtitle, trailing actions, solid/over-image/flat-surface (`bareBack`) states |
 | `CustomTabBar` | Themed bottom tab bar with lime active rail, haptics, and badges |
 
 ## Interaction Rules

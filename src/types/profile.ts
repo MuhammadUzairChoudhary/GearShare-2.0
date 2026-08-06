@@ -11,6 +11,8 @@ export interface Profile {
   verificationStatus: VerificationStatus;
   ratingAverage: number | null;
   ratingCount: number;
+  /** Last time the user was active — drives "Online" / "Last online · …" in chat. */
+  lastActiveAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

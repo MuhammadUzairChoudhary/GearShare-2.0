@@ -1,9 +1,17 @@
 import React, { useCallback, useState, useEffect } from 'react';
-import { View, ScrollView, TouchableOpacity, Text, Modal, TextInput } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Text, Modal, TextInput, Image } from 'react-native';
 import { Stack, useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppIcon } from '../../components/ui/Icons';
+import { BackButton } from '../../components/ui/BackButton';
 import { AlpineDialog } from '../../components/ui/AlpineDialog';
+import { GearPreviewSheet } from '../../components/ui/GearPreviewSheet';
+import {
+  OptionsMenu,
+  OptionsMenuItem,
+  OptionsMenuTrigger,
+  type OptionsMenuTriggerHandle,
+} from '../../components/ui/OptionsMenu';
 import { useTheme } from '../../theme/ThemeContext';
 import { fontFamilies } from '../../theme/typography';
 import { spacing, radius } from '../../theme/spacing';
@@ -302,7 +310,9 @@ export default function RentalDetailScreen() {
   const [reviewText, setReviewText] = useState('');
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   // Vertical offset for the options dropdown — measured from the 3-dot button
+  // in window coordinates, so safe-area insets + header padding are included.
   const [optionsAnchorTop, setOptionsAnchorTop] = useState(96);
+  const optionsTriggerRef = React.useRef<OptionsMenuTriggerHandle>(null);
   const demoStatus = (cancelled ? 'cancelled' : DEMO_PHASES[demoPhase]) as RentalStatus;
 
   // ── Real rental query OR demo listing query ────────────────
@@ -406,6 +416,11 @@ export default function RentalDetailScreen() {
     setShowCancelDialog(true);
   }, []);
 
+  const handleOpenOptions = useCallback(() => {
+    setOptionsAnchorTop(optionsTriggerRef.current?.getAnchorTop() ?? 96);
+    setShowOptionsMenu(true);
+  }, []);
+
   const confirmCancelRental = useCallback(() => {
     setShowCancelDialog(false);
     setCancelled(true);
@@ -433,13 +448,7 @@ export default function RentalDetailScreen() {
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: spacing.xxl, paddingTop: 48 }}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={{ width: 40, height: 40, backgroundColor: colors.background, borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}
-            accessibilityLabel="Go back"
-          >
-            <AppIcon name="back" size={14} color="#1F2225" />
-          </TouchableOpacity>
+          <BackButton />
         </View>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg }}>
           <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
@@ -487,33 +496,21 @@ export default function RentalDetailScreen() {
       <View style={{ padding: spacing.lg, paddingTop: 48, backgroundColor: 'rgba(255,255,255,0.8)', borderBottomWidth: 1, borderBottomColor: '#DDE1E3' }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           {/* Back button */}
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={{ width: 40, height: 40, backgroundColor: colors.white, borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}
-            accessibilityLabel="Go back"
-          >
-            <AppIcon name="back" size={14} color="#1F2225" />
-          </TouchableOpacity>
+          <BackButton />
 
           {/* Title */}
           <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(18), lineHeight: rf(28), letterSpacing: -0.45, textTransform: 'uppercase', color: '#1F2225' }}>
             Rental Detail
           </Text>
 
-          {/* Options menu — ⋮ opens the dropdown when Cancel Rental is available; otherwise the info icon jumps straight to rental details; hidden before the request is submitted */}
+          {/* Options menu — ⋮ vertical dots open the dropdown (Rental Details / Cancel Rental) */}
           {rentalStarted ? (
-            <TouchableOpacity
-              onPress={() => (canShowCancelOption ? setShowOptionsMenu(true) : setShowRentalDetails(true))}
-              onLayout={(e) => setOptionsAnchorTop(e.nativeEvent.layout.y + e.nativeEvent.layout.height + 8)}
-              style={{ width: 40, height: 40, backgroundColor: colors.white, borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}
-              accessibilityLabel={canShowCancelOption ? 'Rental options' : 'Rental details'}
-            >
-              {canShowCancelOption ? (
-                <Ionicons name="ellipsis-horizontal" size={16} color="#1F2225" />
-              ) : (
-                <AppIcon name="info" size={14} color="#1F2225" />
-              )}
-            </TouchableOpacity>
+            <OptionsMenuTrigger
+              ref={optionsTriggerRef}
+              onPress={handleOpenOptions}
+              accessibilityLabel="Rental options"
+              testID="rental-options-trigger"
+            />
           ) : (
             <View style={{ width: 40, height: 40 }} />
           )}
@@ -1115,9 +1112,17 @@ export default function RentalDetailScreen() {
                 activeOpacity={0.8}
                 style={{ borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, padding: 12, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: spacing.lg }}
               >
-                <View style={{ width: 48, height: 48, backgroundColor: '#ECEEEF', borderRadius: 6 }}>
-                  <View style={{ flex: 1, backgroundColor: colors.graphite300, opacity: 0.2 }} />
-                </View>
+                {listing?.images?.[0]?.storagePath ? (
+                  <Image
+                    source={{ uri: listing.images[0].storagePath }}
+                    style={{ width: 48, height: 48, borderRadius: 6, backgroundColor: '#ECEEEF' }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={{ width: 48, height: 48, backgroundColor: '#ECEEEF', borderRadius: 6 }}>
+                    <View style={{ flex: 1, backgroundColor: colors.graphite300, opacity: 0.2 }} />
+                  </View>
+                )}
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(14), lineHeight: rf(18), textTransform: 'uppercase', color: '#1F2225' }} numberOfLines={1}>
                     {gear?.name ?? 'Black Diamond Camalot C4 Set'}
@@ -1162,231 +1167,47 @@ export default function RentalDetailScreen() {
       </Modal>
 
       {/* ════════════════════════════════════════════════════════════ */}
-      {/* ── PRODUCT DETAIL MODAL — bottom sheet with full gear info ── */}
+      {/* ── GEAR PREVIEW SHEET — shared bottom sheet with full gear info ── */}
       {/* ════════════════════════════════════════════════════════════ */}
-      <Modal
-        animationType="slide"
-        transparent={true}
+      <GearPreviewSheet
         visible={showProductModal}
-        onRequestClose={() => setShowProductModal(false)}
-      >
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-          {/* Backdrop tap to close — lighter so the rental details sheet behind stays visible */}
-          <TouchableOpacity
-            activeOpacity={1}
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.2)' }}
-            onPress={() => setShowProductModal(false)}
-          />
-          {/* Sheet content */}
-          <View style={{
-            backgroundColor: colors.background,
-            borderRadius: radius.bottomSheet,
-            borderBottomLeftRadius: 0,
-            borderBottomRightRadius: 0,
-            overflow: 'hidden',
-            paddingHorizontal: spacing.xl,
-            paddingTop: spacing.lg,
-            paddingBottom: 40,
-            height: '75%',
-          }}>
-            {/* Drag handle */}
-            <View style={{ width: 40, height: 4, backgroundColor: '#DDE1E3', borderRadius: 2, alignSelf: 'center', marginBottom: spacing.lg }} />
-
-            {/* Close button — title shrinks so the close never overflows */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: spacing.lg }}>
-              <Text numberOfLines={1} style={{ flex: 1, fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(18), lineHeight: rf(26), letterSpacing: -0.45, textTransform: 'uppercase', color: '#1F2225' }}>
-                {gear?.name ?? 'Product Details'}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setShowProductModal(false)}
-                style={{ width: 36, height: 36, backgroundColor: colors.white, borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Ionicons name="close" size={14} color="#1F2225" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Scrollable content inside modal */}
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* ── Image gallery ── */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.lg, marginHorizontal: -spacing.xl }} contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: 8 }}>
-                {[1, 2, 3, 4].map((img, j) => (
-                  <View key={j} style={{ width: 220, height: 150, backgroundColor: j === 0 ? '#DDE1E3' : '#ECEEEF', borderRadius: 8 }}>
-                    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name="image-outline" size={28} color="rgba(44,48,52,0.25)" />
-                    </View>
-                  </View>
-                ))}
-              </ScrollView>
-
-              {/* ── Hero section: Price + Rating in a card (same look as the gear page pricing card) ── */}
-              <View style={{ padding: spacing.lg, backgroundColor: '#F8F9F9', borderWidth: 1, borderColor: '#DDE1E3', borderRadius: radius.card, marginBottom: spacing.lg }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                  <View>
-                    <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(24), lineHeight: rf(30), color: '#1F2225' }}>{formatMoney(dailyPrice)}</Text>
-                    <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.9, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>PER DAY</Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(15), lineHeight: rf(20), color: '#1F2225' }}>★ 4.9</Text>
-                    <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(9), lineHeight: rf(13), color: 'rgba(44,48,52,0.4)' }}>56 reviews</Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* ── Section: Technical Specs ── */}
-              <View style={{ backgroundColor: '#F8F9F9', borderWidth: 1, borderColor: '#DDE1E3', borderRadius: radius.card, padding: spacing.lg, marginBottom: spacing.lg }}>
-                <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(16), letterSpacing: 1.2, textTransform: 'uppercase', color: '#1F2225', paddingBottom: 8 }}>Technical Specifications</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                  {[
-                    { label: 'WEIGHT', value: '1.28 KG' },
-                    { label: 'SIZE RANGE', value: '0.3 – 4.0' },
-                    { label: 'MATERIAL', value: 'Aluminum' },
-                    { label: 'MFG YEAR', value: '2023' },
-                    { label: 'CONDITION', value: 'Excellent' },
-                    { label: 'SERIAL', value: 'BD-928-C4' },
-                  ].map((spec, j) => (
-                    <View key={j} style={{ width: '50%', paddingVertical: 6 }}>
-                      <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(7), lineHeight: rf(11), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>{spec.label}</Text>
-                      <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(12), lineHeight: rf(17), color: '#1F2225', marginTop: 1 }}>{spec.value}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-
-              {/* ── Section: Condition ── */}
-              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(16), letterSpacing: 1.2, textTransform: 'uppercase', color: '#1F2225', marginBottom: 8 }}>Gear Condition</Text>
-              <View style={{ padding: spacing.lg, backgroundColor: '#F8F9F9', borderWidth: 1, borderColor: '#DDE1E3', borderRadius: radius.card, marginBottom: spacing.lg }}>
-                <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
-                  <View style={{ width: 48, height: 48, backgroundColor: 'rgba(200,255,61,0.4)', borderRadius: 4, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="checkmark-circle" size={24} color="#1F2225" />
-                  </View>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(14), lineHeight: rf(20), textTransform: 'uppercase', color: '#1F2225' }}>Excellent Condition</Text>
-                    <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(12), lineHeight: rf(20), color: 'rgba(44,48,52,0.6)' }}>
-                      Minor cosmetic scratches on lobes. Slings are original with zero signs of wear.
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* ── Section: Owner ── */}
-              <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(16), letterSpacing: 1.2, textTransform: 'uppercase', color: '#1F2225', marginBottom: 8 }}>Gear Owner</Text>
-              <View style={{ padding: spacing.lg, backgroundColor: '#F8F9F9', borderWidth: 1, borderColor: '#DDE1E3', borderRadius: radius.card, marginBottom: spacing.lg }}>
-                <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
-                  {/* Avatar with verified badge */}
-                  <View style={{ width: 55, height: 56, position: 'relative' }}>
-                    <View style={{ width: 55, height: 56, backgroundColor: colors.graphite300, borderRadius: 9999 }} />
-                    <View style={{ position: 'absolute', right: -4, bottom: -4, width: 20, height: 20, backgroundColor: colors.signalLime, borderWidth: 2, borderColor: '#F8F9F9', borderRadius: 9999, alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ fontSize: rf(7), color: '#1F2225', fontWeight: '700' }}>✓</Text>
-                    </View>
-                  </View>
-                  {/* Info */}
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(14), lineHeight: rf(20), color: '#1F2225' }}>{owner?.fullName ?? 'Marc Giroud'}</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(10), lineHeight: rf(15), color: 'rgba(44,48,52,0.6)' }}>Verified Guide</Text>
-                      <View style={{ width: 4, height: 4, backgroundColor: '#CFD4D8', borderRadius: 9999 }} />
-                      <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(10), lineHeight: rf(15), color: 'rgba(44,48,52,0.6)' }}>120 Rentals</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                      <Ionicons name="flash" size={9} color={colors.signalLime} />
-                      <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(9), lineHeight: rf(14), textTransform: 'uppercase', color: '#1F2225' }}>Responds in 5m</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              {/* ── Section: About ── */}
-              <View style={{ gap: 4, marginBottom: spacing.lg }}>
-                <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(16), letterSpacing: 1.2, textTransform: 'uppercase', color: '#1F2225' }}>Description</Text>
-                <View style={{ height: 1, backgroundColor: '#ECEEEF' }} />
-              </View>
-              <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(13), lineHeight: rf(20), color: 'rgba(44,48,52,0.8)', marginBottom: spacing.lg }}>
-                Full set of Black Diamond Camalot C4s, ranging from #0.3 to #4. These are the latest model — 10% lighter than previous generations with a redesigned lobe for better grip and surface area contact.
-              </Text>
-
-              {/* ── Section: Policies ── */}
-              <View style={{ gap: 4, marginBottom: 8 }}>
-                <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(16), letterSpacing: 1.2, textTransform: 'uppercase', color: '#1F2225' }}>Platform Policies</Text>
-                <View style={{ height: 1, backgroundColor: '#ECEEEF' }} />
-              </View>
-              <View style={{ backgroundColor: '#F8F9F9', borderWidth: 1, borderColor: '#DDE1E3', borderRadius: radius.card, padding: spacing.lg, marginBottom: 20 }}>
-                <View style={{ flexDirection: 'row', gap: 10, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#ECEEEF' }}>
-                  <View style={{ marginTop: 2 }}>
-                    <AppIcon name="damage-protection" size={15.75} color="#1F2225" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(10), lineHeight: rf(15), textTransform: 'uppercase', color: '#1F2225' }}>Damage Protection</Text>
-                    <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(15), color: 'rgba(44,48,52,0.5)', marginTop: 2 }}>Renters are responsible for replacement costs of lost or non-functional equipment.</Text>
-                  </View>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 10, paddingTop: 12 }}>
-                  <View style={{ marginTop: 2 }}>
-                    <AppIcon name="calendar" size={14} color="#1F2225" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(10), lineHeight: rf(15), textTransform: 'uppercase', color: '#1F2225' }}>Cancellation</Text>
-                    <Text style={{ fontFamily: fontFamilies.inter.regular, fontSize: rf(10), lineHeight: rf(15), color: 'rgba(44,48,52,0.5)', marginTop: 2 }}>Free cancellation until 48h before pickup. 50% fee applies after.</Text>
-                  </View>
-                </View>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+        listing={listing}
+        onClose={() => setShowProductModal(false)}
+        testID="product-preview-sheet"
+      />
 
       {/* ════════════════════════════════════════════════════════════ */}
-      {/* ── OPTIONS DROPDOWN — anchored under the header 3-dot button ── */}
+      {/* ── OPTIONS MENU — shared dropdown anchored under the 3-dot button ── */}
       {/* ════════════════════════════════════════════════════════════ */}
-      <Modal
-        animationType="fade"
-        transparent={true}
+      <OptionsMenu
         visible={showOptionsMenu}
-        onRequestClose={() => setShowOptionsMenu(false)}
+        onClose={() => setShowOptionsMenu(false)}
+        anchorTop={optionsAnchorTop}
+        testID="rental-options-menu"
       >
-        <TouchableOpacity
-          activeOpacity={1}
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.15)' }}
-          onPress={() => setShowOptionsMenu(false)}
-        >
-          {/* Dropdown card — right-aligned with the 3-dot button */}
-          <View
-            onStartShouldSetResponder={() => true}
-            style={{ position: 'absolute', top: optionsAnchorTop, right: spacing.lg, minWidth: 230, backgroundColor: colors.white, borderWidth: 1, borderColor: '#DDE1E3', borderRadius: 10, paddingVertical: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 6 }}
-          >
-            {/* ── Rental details — opens the rental details sheet ── */}
-            <TouchableOpacity
-              onPress={() => { setShowOptionsMenu(false); setShowRentalDetails(true); }}
-              activeOpacity={0.7}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 }}
-            >
-              <View style={{ width: 28, height: 28, backgroundColor: '#F8F9F9', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
-                <AppIcon name="info" size={14} color="#1F2225" />
-              </View>
-              <Text style={{ flex: 1, fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(17), color: '#1F2225' }}>Rental Details</Text>
-            </TouchableOpacity>
+        {/* ── Rental details — opens the rental details sheet ── */}
+        <OptionsMenuItem
+          icon={<AppIcon name="info" size={14} color="#1F2225" />}
+          label="Rental Details"
+          onPress={() => {
+            setShowOptionsMenu(false);
+            setShowRentalDetails(true);
+          }}
+          testID="rental-details-item"
+        />
 
-            {/* ── Cancel rental — only in the request phase and at least 48h before pickup ── */}
-            {canShowCancelOption && (
-              <>
-                <View style={{ height: 1, backgroundColor: '#ECEEEF', marginHorizontal: 12 }} />
-                <TouchableOpacity
-                  onPress={handleCancelRental}
-                  activeOpacity={0.7}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 }}
-                >
-                  {/* Icon tile matches the info icon's 14px size and tile */}
-                  <View style={{ width: 28, height: 28, backgroundColor: '#F8F9F9', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="close-circle-outline" size={14} color="#EF4444" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(12), lineHeight: rf(17), color: '#EF4444' }}>Cancel Rental</Text>
-                  </View>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </TouchableOpacity>
-      </Modal>
+        {/* ── Cancel rental — only in the request phase and at least 48h before pickup ── */}
+        {canShowCancelOption && (
+          <OptionsMenuItem
+            divider
+            icon={<Ionicons name="close-circle-outline" size={14} color="#EF4444" />}
+            label="Cancel Rental"
+            onPress={handleCancelRental}
+            destructive
+            testID="cancel-rental-item"
+          />
+        )}
+      </OptionsMenu>
 
       {/* ── Cancel rental confirmation — destructive, explains consequences ── */}
       <AlpineDialog
