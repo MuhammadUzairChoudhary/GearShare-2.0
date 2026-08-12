@@ -8,7 +8,6 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { fontFamilies } from '../../theme/typography';
@@ -28,8 +27,9 @@ import {
  * - Trigger: vertical 3-dot button (40×40, bordered surface, hit slop).
  * - Menu: modal with controlled backdrop, dropdown card right-aligned under
  *   the trigger via `anchorTop` (measured from the trigger's onLayout).
- * - Items: `OptionsMenuItem` rows with a 28×28 icon tile + label; optional
- *   divider and destructive (error-red) treatment.
+ * - Items: `OptionsMenuItem` rows with a 28×28 icon tile + label (or
+ *   text-only when no icon is given); optional divider and destructive
+ *   (error-red) treatment.
  */
 interface OptionsMenuProps {
   visible: boolean;
@@ -80,8 +80,8 @@ export function OptionsMenu({ visible, onClose, anchorTop, children, testID }: O
 }
 
 interface OptionsMenuItemProps {
-  /** Icon rendered inside the 28×28 tile. */
-  icon: React.ReactNode;
+  /** Icon rendered inside the 28×28 tile. Omit for a text-only row. */
+  icon?: React.ReactNode;
   label: string;
   onPress: () => void;
   /** Error-red label + tile icon colour — for destructive actions (e.g. Delete). */
@@ -113,20 +113,29 @@ export function OptionsMenuItem({
         testID={testID}
         accessibilityRole="button"
         accessibilityLabel={label}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 }}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: icon ? 10 : 0,
+          paddingHorizontal: icon ? 12 : spacing.lg,
+          paddingVertical: icon ? 10 : 12,
+          minHeight: 44,
+        }}
       >
-        <View
-          style={{
-            width: 28,
-            height: 28,
-            backgroundColor: colors.surface,
-            borderRadius: 6,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {icon}
-        </View>
+        {icon ? (
+          <View
+            style={{
+              width: 28,
+              height: 28,
+              backgroundColor: colors.surface,
+              borderRadius: 6,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {icon}
+          </View>
+        ) : null}
         <Text
           style={{
             flex: 1,
@@ -227,9 +236,10 @@ export const OptionsMenuTrigger = React.forwardRef<OptionsMenuTriggerHandle, Opt
             width: TRIGGER_SIZE,
             height: TRIGGER_SIZE,
             borderRadius: 10,
+            // Default (theme background): no outline — just the dots. The
+            // white fill is invisible on the white header but gives a subtle
+            // pressed state on top of it.
             ...(mode ? headerActionContainer(mode, colors, isDark) : {
-              borderWidth: 1,
-              borderColor: colors.border,
               backgroundColor: colors.surfaceElevated,
             }),
             alignItems: 'center',
@@ -242,7 +252,7 @@ export const OptionsMenuTrigger = React.forwardRef<OptionsMenuTriggerHandle, Opt
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
       >
-        <AppIcon name="dots-vertical" size={16} color={colors.textPrimary} />
+        <AppIcon name="dots-vertical" size={20} color={colors.textPrimary} />
       </AlpinePressable>
     );
   },

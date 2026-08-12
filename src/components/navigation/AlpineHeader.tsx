@@ -26,11 +26,6 @@ interface AlpineHeaderProps {
    * fill of its own and the back button is bare (no stroke, no fill).
    */
   bareBack?: boolean;
-  /**
-   * Render the subtitle on the same row as the title (beside the avatar),
-   * e.g. "Marc Giroud · Last online 3 min ago" instead of a second line.
-   */
-  subtitleInline?: boolean;
   /** Scrolled solid state: opaque background + one-pixel bottom divider. */
   scrolled?: boolean;
   testID?: string;
@@ -54,7 +49,6 @@ export function AlpineHeader({
   trailing,
   transparent = false,
   bareBack = false,
-  subtitleInline = false,
   scrolled = false,
   testID,
 }: AlpineHeaderProps) {
@@ -94,82 +88,54 @@ export function AlpineHeader({
         <AlpinePressable
           onPress={onTitlePress}
           disabled={!onTitlePress}
-          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}
+          style={{ flex: 1 }}
           pressedStyle={{ opacity: 0.6 }}
           accessibilityRole={onTitlePress ? 'button' : 'text'}
           accessibilityLabel={
             onTitlePress ? `${title}${subtitle ? `, ${subtitle}` : ''}. View profile` : undefined
           }
         >
-          {avatar ? <Avatar uri={avatar.uri} name={avatar.name} size="md" /> : null}
+          {/*
+            Row layout lives on an inner View — AlpinePressable wraps children in
+            a column Animated.View (for the scale), so flexDirection on the
+            pressable style alone would stack the avatar above the text.
+          */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            {avatar ? <Avatar uri={avatar.uri} name={avatar.name} size="md" /> : null}
 
-          <View style={{ flex: 1 }}>
-            {subtitleInline && subtitle ? (
-              <View
-                testID="alpine-header-title-row"
-                style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontFamily: fontFamilies.spaceGrotesk.bold,
+                  fontSize: rf(14),
+                  lineHeight: rf(20),
+                  letterSpacing: -0.3,
+                  color: transparent ? colors.carbon950 : colors.textPrimary,
+                }}
               >
+                {title}
+              </Text>
+              {subtitle ? (
                 <Text
                   numberOfLines={1}
                   style={{
-                    flexShrink: 1,
-                    fontFamily: fontFamilies.spaceGrotesk.bold,
-                    fontSize: rf(14),
-                    lineHeight: rf(20),
-                    letterSpacing: -0.3,
-                    color: transparent ? colors.carbon950 : colors.textPrimary,
-                  }}
-                >
-                  {title}
-                </Text>
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    flexShrink: 1,
                     fontFamily: fontFamilies.inter.regular,
                     fontSize: rf(9),
                     lineHeight: rf(13),
                     color: transparent ? colors.graphite500 : colors.textSecondary,
+                    marginTop: 1,
                   }}
                 >
                   {subtitle}
                 </Text>
-              </View>
-            ) : (
-              <>
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    fontFamily: fontFamilies.spaceGrotesk.bold,
-                    fontSize: rf(14),
-                    lineHeight: rf(20),
-                    letterSpacing: -0.3,
-                    color: transparent ? colors.carbon950 : colors.textPrimary,
-                  }}
-                >
-                  {title}
-                </Text>
-                {subtitle ? (
-                  <Text
-                    numberOfLines={1}
-                    style={{
-                      fontFamily: fontFamilies.inter.regular,
-                      fontSize: rf(9),
-                      lineHeight: rf(13),
-                      color: transparent ? colors.graphite500 : colors.textSecondary,
-                      marginTop: 1,
-                    }}
-                  >
-                    {subtitle}
-                  </Text>
-                ) : null}
-              </>
-            )}
+              ) : null}
+            </View>
           </View>
         </AlpinePressable>
 
         {trailing ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
             {trailing}
           </View>
         ) : (

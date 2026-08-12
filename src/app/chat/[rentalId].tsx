@@ -24,6 +24,7 @@ import { Avatar } from '../../components/ui/Avatar';
 import { GearPreviewSheet } from '../../components/ui/GearPreviewSheet';
 import { AlpineDialog } from '../../components/ui/AlpineDialog';
 import { IconButton } from '../../components/ui/IconButton';
+import { getRentalStatusLabel, type RentalStatus } from '../../types/rental';
 import {
   OptionsMenu,
   OptionsMenuItem,
@@ -54,6 +55,11 @@ import type { Listing } from '../../types/listing';
 // ── Helpers ───────────────────────────────────────────────────────────────
 /** WhatsApp-style read-receipt blue (deliberately outside the Alpine palette). */
 const READ_BLUE = '#34B7F1';
+// Messaging-app bubble geometry (WhatsApp/Telegram style): a rounded body with
+// a clearly squared tail corner on the sender side. The contrast between the
+// two radii is what makes the bubble read as directional and native.
+const BUBBLE_RADIUS = 14;
+const BUBBLE_TAIL_RADIUS = 4;
 
 function isSameDay(a: string, b: string) {
   const da = new Date(a);
@@ -65,34 +71,39 @@ function isSameDay(a: string, b: string) {
   );
 }
 
-// ── Day separator ─────────────────────────────────────────────────────────
+// ── Day separator — quiet pill instead of a hard divider line ────────────
 function DayDivider({ date }: { date: string }) {
   const { colors } = useTheme();
   return (
     <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-        marginVertical: spacing.md,
-      }}
+      style={{ alignItems: 'center', marginVertical: spacing.md }}
       accessibilityRole="header"
       accessibilityLabel={`Messages from ${formatDayDivider(date)}`}
     >
-      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-      <Text
+      {/* Matches the theme's pill language (fully rounded, mono uppercase)
+          with a white surface so the label reads as a quiet tag on the
+          grey field — no horizontal rule. */}
+      <View
         style={{
-          fontFamily: fontFamilies.ibmPlexMono.semiBold,
-          fontSize: rf(8),
-          lineHeight: rf(12),
-          letterSpacing: 0.8,
-          textTransform: 'uppercase',
-          color: colors.textSecondary,
+          paddingHorizontal: spacing.md,
+          paddingVertical: 3,
+          borderRadius: 9999,
+          backgroundColor: colors.white,
         }}
       >
-        {formatDayDivider(date)}
-      </Text>
-      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+        <Text
+          style={{
+            fontFamily: fontFamilies.ibmPlexMono.semiBold,
+            fontSize: rf(8),
+            lineHeight: rf(12),
+            letterSpacing: 0.8,
+            textTransform: 'uppercase',
+            color: colors.textSecondary,
+          }}
+        >
+          {formatDayDivider(date)}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -111,7 +122,7 @@ function SystemEvent({ body }: { body: string }) {
       accessibilityRole="text"
       accessibilityLabel={body}
     >
-      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+      <View style={{ flex: 1, height: 1, backgroundColor: colors.graphite300 }} />
       <Text
         style={{
           fontFamily: fontFamilies.ibmPlexMono.semiBold,
@@ -125,7 +136,7 @@ function SystemEvent({ body }: { body: string }) {
       >
         {body}
       </Text>
-      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+      <View style={{ flex: 1, height: 1, backgroundColor: colors.graphite300 }} />
     </View>
   );
 }
@@ -168,13 +179,14 @@ function MessageBubble({
           style={{
             paddingHorizontal: spacing.md,
             paddingVertical: spacing.sm,
-            borderRadius: radius.card,
-            // Mine: theme lime, top-right corner less rounded. Theirs: white,
-            // top-left corner less rounded. No strokes on either bubble.
+            borderRadius: BUBBLE_RADIUS,
+            // Classic messaging tail: the corner on the sender side (bottom
+            // right for mine, bottom left for theirs) is squared while the
+            // rest stay fully rounded — no strokes on either bubble.
             // Time + read ticks sit inside the bubble, bottom-right.
             backgroundColor: mine ? colors.signalLime : colors.white,
-            borderTopRightRadius: mine ? 4 : radius.card,
-            borderTopLeftRadius: mine ? radius.card : 4,
+            borderBottomRightRadius: mine ? BUBBLE_TAIL_RADIUS : BUBBLE_RADIUS,
+            borderBottomLeftRadius: mine ? BUBBLE_RADIUS : BUBBLE_TAIL_RADIUS,
           }}
         >
           <Text
@@ -199,8 +211,10 @@ function MessageBubble({
             >
               {isRead ? (
                 <Ionicons
-                  name="checkmark-done"
-                  size={13}
+                  // Sharp variant = square caps, visibly heavier than the
+                  // round glyph — reads clearly at bubble size.
+                  name="checkmark-done-sharp"
+                  size={14}
                   color={READ_BLUE}
                   // Decorative — the bubble's own label announces Read/Sent,
                   // so never double-announce on Android.
@@ -208,8 +222,8 @@ function MessageBubble({
                 />
               ) : (
                 <Ionicons
-                  name="checkmark"
-                  size={13}
+                  name="checkmark-sharp"
+                  size={14}
                   color={colors.graphite500}
                   importantForAccessibility="no"
                 />
@@ -245,20 +259,22 @@ function MessageBubble({
   );
 }
 
-// ── Gear card — thumbnail + name + owner, tap opens the gear preview sheet ──
-// Matches the rental flow's gear preview card: image left, name + owner,
-// chevron right. No status readouts — those live on the rental detail.
+// ── Gear card — thumbnail + name + rental status, tap opens the preview ──
+// Matches the rental flow's gear preview card: image left, name + status,
+// chevron right. The owner lives in the header, so the card stays about
+// the gear and where the rental stands.
 function GearCard({
   listing,
+  status,
   onPress,
 }: {
   listing: Listing | null | undefined;
+  status?: RentalStatus;
   onPress: (() => void) | undefined;
 }) {
   const { colors } = useTheme();
   const thumb = listing?.images?.[0]?.storagePath ?? null;
   const name = listing?.gearItem?.name ?? 'Rental';
-  const ownerName = listing?.owner?.fullName ?? 'Gear owner';
 
   return (
     <AlpinePressable
@@ -266,9 +282,8 @@ function GearCard({
       disabled={!onPress}
       pressedStyle={{ backgroundColor: colors.surface }}
       style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.md,
+        // Row layout lives on an inner View — AlpinePressable wraps children
+        // in a column Animated.View, so a row here would stack image over text.
         paddingHorizontal: spacing.lg,
         paddingVertical: spacing.sm,
         borderBottomWidth: 1,
@@ -276,73 +291,94 @@ function GearCard({
         backgroundColor: colors.surfaceElevated,
       }}
       accessibilityRole="button"
-      accessibilityLabel={`${name}, listed by ${ownerName}. View gear details`}
+      accessibilityLabel={`${name}. View gear details`}
     >
-      {thumb ? (
-        <Image
-          source={{ uri: thumb }}
-          resizeMode="cover"
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: radius.image,
-            backgroundColor: colors.surface,
-          }}
-          accessibilityRole="image"
-          accessibilityLabel={name}
-        />
-      ) : (
-        <View
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: radius.image,
-            backgroundColor: colors.surface,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        {thumb ? (
+          <Image
+            source={{ uri: thumb }}
+            resizeMode="cover"
             style={{
-              fontFamily: fontFamilies.spaceGrotesk.bold,
-              fontSize: rf(10),
-              color: colors.textTertiary,
-              textTransform: 'uppercase',
+              width: 48,
+              height: 48,
+              borderRadius: radius.image,
+              backgroundColor: colors.surface,
+            }}
+            accessibilityRole="image"
+            accessibilityLabel={name}
+          />
+        ) : (
+          <View
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: radius.image,
+              backgroundColor: colors.surface,
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            {name.slice(0, 2)}
+            <Text
+              style={{
+                fontFamily: fontFamilies.spaceGrotesk.bold,
+                fontSize: rf(10),
+                color: colors.textTertiary,
+                textTransform: 'uppercase',
+              }}
+            >
+              {name.slice(0, 2)}
+            </Text>
+          </View>
+        )}
+
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            numberOfLines={1}
+            style={{
+              fontFamily: fontFamilies.spaceGrotesk.bold,
+              fontSize: rf(14),
+              lineHeight: rf(18),
+              textTransform: 'uppercase',
+              color: colors.textPrimary,
+            }}
+          >
+            {name}
           </Text>
+          {status && (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.xs,
+                marginTop: 2,
+              }}
+              accessibilityLabel={`Rental status: ${getRentalStatusLabel(status)}`}
+            >
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: colors.success,
+                }}
+              />
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontFamily: fontFamilies.inter.semiBold,
+                  fontSize: rf(10),
+                  lineHeight: rf(14),
+                  color: colors.success,
+                }}
+              >
+                {getRentalStatusLabel(status)}
+              </Text>
+            </View>
+          )}
         </View>
-      )}
 
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          numberOfLines={1}
-          style={{
-            fontFamily: fontFamilies.spaceGrotesk.bold,
-            fontSize: rf(14),
-            lineHeight: rf(18),
-            textTransform: 'uppercase',
-            color: colors.textPrimary,
-          }}
-        >
-          {name}
-        </Text>
-        <Text
-          numberOfLines={1}
-          style={{
-            fontFamily: fontFamilies.inter.bold,
-            fontSize: rf(10),
-            lineHeight: rf(14),
-            color: colors.textSecondary,
-            marginTop: 2,
-          }}
-        >
-          {ownerName}
-        </Text>
+        {onPress && <Ionicons name="chevron-forward" size={14} color={colors.graphite500} />}
       </View>
-
-      {onPress && <Ionicons name="chevron-forward" size={14} color={colors.graphite500} />}
     </AlpinePressable>
   );
 }
@@ -537,9 +573,15 @@ export default function ChatScreen() {
   const isActive = canSend || sendMessage.isPending;
 
   return (
-    // Chat field is the same light grey as a pressed chat card — white
-    // bubbles and the lime sender bubble sit on it without any strokes.
-    <View style={{ flex: 1, backgroundColor: colors.surface }}>
+    // The whole screen sits inside a KeyboardAvoidingView — on Android the OS
+    // window resize is unreliable with edge-to-edge (the composer only rose
+    // when the resize happened to fire), so the KAV deterministically shrinks
+    // the container by the keyboard height instead. Same proven pattern as
+    // the auth forms. The composer is the last child, so it always rises.
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1, backgroundColor: colors.titanium100 }}
+    >
       <Stack.Screen options={{ headerShown: false }} />
       <AlpineHeader
         title={otherPartyName}
@@ -547,17 +589,14 @@ export default function ChatScreen() {
         avatar={{ uri: otherParty?.avatarUrl ?? null, name: otherPartyName }}
         onTitlePress={handleOpenProfile}
         onBack={() => router.back()}
-        // Chat sits on the grey surface field — header takes no fill, and the
-        // back button is bare (no stroke, no fill) to match the surface.
-        bareBack
-        // Name + presence sit on one row beside the avatar, not under it.
-        subtitleInline
+        // Solid white header above the grey message field — the back/call/
+        // options buttons keep their normal bordered surface on white.
+        // Avatar left, name beside it, presence stacked under the name.
         trailing={
           <>
             <IconButton
               appIcon="call"
-              size={16}
-              bare
+              size={20}
               onPress={handleCall}
               accessibilityLabel={`Call ${otherPartyName}`}
               style={{ width: 40, height: 40, minWidth: 40, minHeight: 40 }}
@@ -567,15 +606,15 @@ export default function ChatScreen() {
               onPress={handleOpenOptions}
               accessibilityLabel="Conversation options"
               testID="chat-options-trigger"
-              bare
             />
           </>
         }
       />
 
-      {/* Gear card — thumbnail + name + owner, opens the gear preview sheet */}
+      {/* Gear card — thumbnail + name + rental status, opens the preview sheet */}
       <GearCard
         listing={listing}
+        status={rental?.status}
         onPress={listing ? () => setShowGearSheet(true) : undefined}
       />
 
@@ -626,79 +665,78 @@ export default function ChatScreen() {
             </AppText>
           </View>
         }
+        keyboardShouldPersistTaps="handled"
         onScroll={handleScroll}
         scrollEventThrottle={16}
         onContentSizeChange={handleContentSizeChange}
         showsVerticalScrollIndicator={false}
       />
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View
-          style={{
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-            backgroundColor: colors.white,
-            paddingHorizontal: spacing.lg,
-            paddingTop: spacing.md,
-            paddingBottom: spacing.lg + insets.bottom,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm }}>
-            <RNTextInput
-              value={draft}
-              onChangeText={setDraft}
-              placeholder={`Message ${firstName}`}
-              placeholderTextColor={colors.textTertiary}
-              multiline
-              style={{
-                flex: 1,
-                minHeight: 44,
-                maxHeight: 120,
-                backgroundColor: colors.surface,
-                borderRadius: radius.input,
-                borderWidth: 1,
-                borderColor: colors.border,
-                paddingHorizontal: spacing.md,
-                paddingVertical: spacing.sm,
-                fontFamily: fontFamilies.inter.regular,
-                fontSize: rf(14),
-                lineHeight: rf(20),
-                color: colors.textPrimary,
-                textAlignVertical: 'top',
-              }}
-              accessibilityLabel={`Message ${firstName}`}
-            />
-            <AlpinePressable
-              onPress={handleSend}
-              disabled={!canSend}
-              pressedStyle={{
-                backgroundColor: isActive ? colors.signalLimeDark : colors.titanium100,
-              }}
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: radius.button,
-                backgroundColor: isActive ? colors.signalLime : colors.titanium100,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Send message"
-              accessibilityState={{ disabled: !canSend, busy: sendMessage.isPending }}
-            >
-              {sendMessage.isPending ? (
-                <ActivityIndicator size="small" color={colors.carbon950} />
-              ) : (
-                <Ionicons
-                  name="arrow-up"
-                  size={18}
-                  color={canSend ? colors.carbon950 : colors.graphite500}
-                />
-              )}
-            </AlpinePressable>
-          </View>
+      <View
+        style={{
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          backgroundColor: colors.white,
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.md,
+          paddingBottom: spacing.lg + insets.bottom,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm }}>
+          <RNTextInput
+            value={draft}
+            onChangeText={setDraft}
+            placeholder={`Message ${firstName}`}
+            placeholderTextColor={colors.textTertiary}
+            multiline
+            style={{
+              flex: 1,
+              minHeight: 44,
+              maxHeight: 120,
+              backgroundColor: colors.surface,
+              borderRadius: radius.input,
+              borderWidth: 1,
+              borderColor: colors.border,
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.sm,
+              fontFamily: fontFamilies.inter.regular,
+              fontSize: rf(14),
+              lineHeight: rf(20),
+              color: colors.textPrimary,
+              textAlignVertical: 'top',
+            }}
+            accessibilityLabel={`Message ${firstName}`}
+          />
+          <AlpinePressable
+            onPress={handleSend}
+            disabled={!canSend}
+            pressedStyle={{
+              backgroundColor: isActive ? colors.signalLimeDark : colors.titanium100,
+            }}
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: radius.button,
+              backgroundColor: isActive ? colors.signalLime : colors.titanium100,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
+            accessibilityState={{ disabled: !canSend, busy: sendMessage.isPending }}
+          >
+            {sendMessage.isPending ? (
+              <ActivityIndicator size="small" color={colors.carbon950} />
+            ) : (
+              <Ionicons
+                name="arrow-up"
+                size={18}
+                color={canSend ? colors.carbon950 : colors.graphite500}
+              />
+            )}
+          </AlpinePressable>
         </View>
-      </KeyboardAvoidingView>
+      </View>
 
       {/* Gear preview sheet — same as the rental flow's product sheet */}
       <GearPreviewSheet
@@ -715,21 +753,16 @@ export default function ChatScreen() {
         testID="chat-options-menu"
       >
         <OptionsMenuItem
-          icon={<Ionicons name="person-outline" size={14} color={colors.textPrimary} />}
           label="View Profile"
           onPress={handleOpenProfile}
           testID="view-profile-item"
         />
         <OptionsMenuItem
-          divider
-          icon={<Ionicons name="archive-outline" size={14} color={colors.textPrimary} />}
           label="Archive"
           onPress={handleArchiveChat}
           testID="archive-chat-item"
         />
         <OptionsMenuItem
-          divider
-          icon={<Ionicons name="trash-outline" size={14} color={colors.error} />}
           label="Delete"
           onPress={handleDeletePress}
           destructive
@@ -748,6 +781,6 @@ export default function ChatScreen() {
         destructive
         testID="delete-chat-dialog"
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }

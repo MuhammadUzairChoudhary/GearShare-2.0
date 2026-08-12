@@ -159,8 +159,12 @@ export function Chip({
       accessibilityLabel={badgeLabel ? `${label}, ${badgeLabel}` : label}
       accessibilityState={{ disabled, selected: variant === 'active' }}
     >
-      <Text style={textStyle}>{label}</Text>
-      {renderBadge()}
+      {/* Row layout on an inner View — AlpinePressable wraps children in a
+          column Animated.View, so the badge stays beside the label. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Text style={textStyle}>{label}</Text>
+        {renderBadge()}
+      </View>
     </AlpinePressable>
   );
 }

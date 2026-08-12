@@ -167,10 +167,23 @@ describe('Mock Repositories', () => {
   describe('MockProfilesRepository', () => {
     const repo = new MockProfilesRepository();
 
-    it('should return profile', async () => {
+    it('should return the signed-in profile', async () => {
       const profile = await repo.getProfile('user-1');
       expect(profile).not.toBeNull();
       expect(profile?.fullName).toBeDefined();
+    });
+
+    it('should resolve other members by their own id (never the signed-in user)', async () => {
+      const sam = await repo.getProfile('user-3');
+      expect(sam?.fullName).toBe('Sam Rivera');
+
+      const morgan = await repo.getProfile('user-4');
+      expect(morgan?.fullName).toBe('Morgan Chen');
+    });
+
+    it('should return null for an unknown member', async () => {
+      const profile = await repo.getProfile('user-999');
+      expect(profile).toBeNull();
     });
 
     it('should update profile', async () => {

@@ -998,6 +998,41 @@ export const mockReviews: Review[] = [
     createdAt: daysAgo(1),
     updatedAt: daysAgo(1),
   },
+  // Sam Rivera (user-3) — reviewed by Alex (rental-2: the climbing cams)
+  {
+    id: 'review-3',
+    rentalId: 'rental-2',
+    reviewerId: 'user-1',
+    reviewedUserId: 'user-3',
+    listingId: 'listing-2',
+    rating: { overall: 5, communication: 5, reliability: 5, equipmentCondition: 5 },
+    feedback: 'Sam had the cams racked and ready at the crag. Zero friction.',
+    createdAt: daysAgo(8),
+    updatedAt: daysAgo(8),
+  },
+  // Morgan Chen (user-4) — reviewed by Alex (rental-4: MSR tent) and for the Domane
+  {
+    id: 'review-4',
+    rentalId: 'rental-4',
+    reviewerId: 'user-1',
+    reviewedUserId: 'user-4',
+    listingId: 'listing-6',
+    rating: { overall: 5, communication: 5, reliability: 5, equipmentCondition: 5 },
+    feedback: 'Morgan is an absolute pro. The tent was immaculate and pickup was easy.',
+    createdAt: daysAgo(26),
+    updatedAt: daysAgo(26),
+  },
+  {
+    id: 'review-5',
+    rentalId: 'rental-3',
+    reviewerId: 'user-1',
+    reviewedUserId: 'user-4',
+    listingId: 'listing-7',
+    rating: { overall: 4, communication: 5, reliability: 4, equipmentCondition: 5 },
+    feedback: 'The Domane was set up spotless. Booking and pickup were easy.',
+    createdAt: daysAgo(12),
+    updatedAt: daysAgo(12),
+  },
 ];
 
 // ============================================================================

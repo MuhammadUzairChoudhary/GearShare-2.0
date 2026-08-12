@@ -71,21 +71,24 @@ function renderSheet(visible: boolean, current: Listing | null = listing) {
 }
 
 describe('GearPreviewSheet', () => {
-  it('renders gear name, price, specs, condition, and owner from the listing', () => {
+  it('renders the product-screen structure from the listing', () => {
     const { getByText, queryByText } = renderSheet(true);
     expect(getByText(/Big Agnes Copper Spur HV UL2/)).toBeTruthy();
-    // Price is rendered as currency — assert the "PER DAY" label instead.
-    expect(getByText('PER DAY')).toBeTruthy();
+    // Pricing card mirrors the product screen — estimated total + deposit.
+    expect(getByText('Estimated Total')).toBeTruthy();
+    expect(getByText('Security Deposit')).toBeTruthy();
+    expect(getByText('for 3 days')).toBeTruthy();
     expect(getByText(/weight/i)).toBeTruthy();
     expect(getByText('Like New')).toBeTruthy();
     expect(getByText('Alex Morgan')).toBeTruthy();
+    expect(getByText('Verified Guide')).toBeTruthy();
     expect(getByText('No smoking')).toBeTruthy();
     expect(queryByText('Product Details')).toBeNull();
   });
 
   it('hides content entirely when not visible', () => {
     const { queryByText } = renderSheet(false);
-    expect(queryByText('PER DAY')).toBeNull();
+    expect(queryByText('Estimated Total')).toBeNull();
     expect(queryByText(/Big Agnes Copper Spur HV UL2/)).toBeNull();
   });
 

@@ -52,16 +52,11 @@ interface AlpinePressableProps {
  * - Maximum translation is 1 px — no elevation, no bounce, no glow.
  * - Skipped entirely when the OS reports "reduce motion".
  * - Disabled controls never receive press handlers or haptics.
- */
-/**
- * The restrained pressable primitive for the Alpine Instrument system.
  *
- * Behaviour:
- * - Scale compresses to pressedScale (0.992 max) for 80 ms, restores in 120 ms.
- * - Optional background/border emphasis via `pressedStyle`.
- * - Maximum translation is 1 px — no elevation, no bounce, no glow.
- * - Skipped entirely when the OS reports "reduce motion".
- * - Disabled controls never receive press handlers or haptics.
+ * Layout note: children render inside an Animated.View (column direction, for
+ * the scale). A horizontal arrangement must therefore live on an inner View —
+ * e.g. `flexDirection: 'row'` on the `style` prop alone will NOT lay children
+ * out in a row (see ConversationCard for the reference pattern).
  */
 export function AlpinePressable({
   children,

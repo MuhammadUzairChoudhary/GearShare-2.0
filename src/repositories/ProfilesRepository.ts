@@ -1,5 +1,5 @@
 import type { Profile, ProfileUpdateInput } from '../types/profile';
-import { mockProfile } from '../mocks/data';
+import { mockProfile, mockProfiles } from '../mocks/data';
 
 export interface ProfilesRepository {
   getProfile(userId: string): Promise<Profile | null>;
@@ -9,8 +9,12 @@ export interface ProfilesRepository {
 export class MockProfilesRepository implements ProfilesRepository {
   private profile: Profile = { ...mockProfile };
 
-  async getProfile(_userId: string): Promise<Profile | null> {
-    return this.profile;
+  async getProfile(userId: string): Promise<Profile | null> {
+    // The signed-in user's profile is the mutable instance (updates apply to
+    // it). Any other id resolves against the mock directory so public profile
+    // pages show the right person — never the signed-in user's data.
+    if (userId === this.profile.id) return this.profile;
+    return mockProfiles.find((p) => p.id === userId) ?? null;
   }
 
   async updateProfile(_userId: string, input: ProfileUpdateInput): Promise<Profile> {

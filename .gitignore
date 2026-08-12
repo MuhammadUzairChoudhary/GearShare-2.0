@@ -39,3 +39,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# AI development tooling - not required in application builds
+.agents/
+.claude/

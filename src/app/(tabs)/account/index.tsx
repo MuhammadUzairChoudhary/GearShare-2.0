@@ -27,6 +27,7 @@ import { useTheme } from '../../../theme/ThemeContext';
 import { ROUTES } from '../../../constants/routes';
 import { getAnalyticsService } from '../../../services/analytics';
 import { formatMoney } from '../../../utils/money';
+import { getProfileTrustBadges } from '../../../utils/profile';
 import type { VerificationStatus } from '../../../types/profile';
 
 type AccountMode = 'hosting' | 'renting';
@@ -223,18 +224,7 @@ export default function AccountScreen() {
   );
 
   // Trust badges derived from real profile data.
-  const trustBadges = useMemo(() => {
-    const badges: string[] = [];
-    if (profile?.verificationStatus === 'verified') badges.push('Verified Member');
-    if (
-      profile?.isOwner &&
-      (profile.ratingCount ?? 0) >= 10 &&
-      (profile.ratingAverage ?? 0) >= 4.5
-    ) {
-      badges.push('Super Host');
-    }
-    return badges;
-  }, [profile]);
+  const trustBadges = useMemo(() => (profile ? getProfileTrustBadges(profile) : []), [profile]);
 
   // Hosting earnings: net (charge − fees) on owner rentals that reached a
   // payable state.

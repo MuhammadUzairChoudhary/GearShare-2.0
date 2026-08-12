@@ -1,6 +1,5 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
-import { StyleSheet, type ViewStyle } from 'react-native';
 import { ThemeProvider } from '../theme/ThemeContext';
 import { AlpineHeader } from '../components/navigation/AlpineHeader';
 
@@ -25,25 +24,9 @@ describe('AlpineHeader', () => {
   });
 
   it('stacks title above subtitle by default', () => {
-    const { queryByTestId, getByText } = renderHeader({ title: 'Marc Giroud', subtitle: 'Online' });
+    const { getByText } = renderHeader({ title: 'Marc Giroud', subtitle: 'Online' });
     expect(getByText('Marc Giroud')).toBeTruthy();
     expect(getByText('Online')).toBeTruthy();
-    // No inline row is rendered in the stacked layout.
-    expect(queryByTestId('alpine-header-title-row')).toBeNull();
-  });
-
-  it('places title and subtitle on the same row when subtitleInline', () => {
-    const { getByTestId, getByText } = renderHeader({
-      title: 'Marc Giroud',
-      subtitle: 'Last online · 3 min ago',
-      subtitleInline: true,
-    });
-    expect(getByText('Marc Giroud')).toBeTruthy();
-    expect(getByText('Last online · 3 min ago')).toBeTruthy();
-    // Both texts share the single inline row beside the avatar.
-    const row = getByTestId('alpine-header-title-row');
-    const rowStyle = StyleSheet.flatten(row.props.style as ViewStyle);
-    expect(rowStyle.flexDirection).toBe('row');
   });
 
   it('announces the title block as a profile button when onTitlePress is set', () => {
