@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Text } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Text, Image } from 'react-native';
 import { Stack, useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppIcon } from '../../components/ui/Icons';
@@ -113,7 +113,15 @@ export default function SearchResultsScreen() {
         >
           {/* ── Image area ── */}
           <View style={{ width: '100%', height: 224, backgroundColor: colors.surface }}>
-            <View style={{ flex: 1, backgroundColor: colors.graphite300, opacity: 0.3 }} />
+            {listing.images?.[0]?.storagePath ? (
+              <Image
+                source={{ uri: listing.images[0].storagePath }}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={{ flex: 1, backgroundColor: colors.graphite300, opacity: 0.3 }} />
+            )}
 
             {/* Rating — top-left, inline text, no box */}
             <View
@@ -743,7 +751,15 @@ function MapPreview({
                     overflow: 'hidden',
                   }}
                 >
-                  <View style={{ flex: 1, backgroundColor: colors.graphite300, opacity: 0.3 }} />
+                  {previewListing.images?.[0]?.storagePath ? (
+                    <Image
+                      source={{ uri: previewListing.images[0].storagePath }}
+                      style={{ width: 96, height: 96 }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={{ flex: 1, backgroundColor: colors.graphite300, opacity: 0.3 }} />
+                  )}
                 </View>
                 {/* Heart button overlay */}
                 <View

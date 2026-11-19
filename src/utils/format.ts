@@ -16,6 +16,40 @@ export function formatShortDate(dateString: string): string {
   });
 }
 
+/**
+ * Compact rental date range.
+ *
+ * When both dates fall in the same calendar month the month is written once:
+ *   "Aug 1-2"  (never "Aug 1 – Aug 2")
+ * A single-day range collapses to one date ("Aug 1"), and ranges that cross
+ * a month boundary keep both months ("Aug 15 – Sep 2").
+ * Accepts ISO strings (rental.startDate/endDate) or Date objects (calendar).
+ */
+export function formatDateRange(startDate: string | Date, endDate: string | Date): string {
+  const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
+  const end = typeof endDate === 'string' ? new Date(endDate) : endDate;
+
+  const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    const startLabel = Number.isNaN(start.getTime()) ? String(startDate) : fmt(start);
+    const endLabel = Number.isNaN(end.getTime()) ? String(endDate) : fmt(end);
+    return `${startLabel} – ${endLabel}`;
+  }
+
+  const sameDay =
+    start.getFullYear() === end.getFullYear() &&
+    start.getMonth() === end.getMonth() &&
+    start.getDate() === end.getDate();
+  if (sameDay) return fmt(start);
+
+  const sameMonth =
+    start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth();
+  if (sameMonth) return `${fmt(start)}-${end.getDate()}`;
+
+  return `${fmt(start)} – ${fmt(end)}`;
+}
+
 export function formatDateTime(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleDateString('en-US', {

@@ -8,8 +8,7 @@ import { BackButton } from '../../components/ui/BackButton';
 import { Avatar } from '../../components/ui/Avatar';
 import { AppText } from '../../components/ui/AppText';
 import { Card } from '../../components/ui/Card';
-import { Chip } from '../../components/ui/Chip';
-import { Divider } from '../../components/ui/Divider';
+import { ProfileHero } from '../../components/ui/ProfileHero';
 import { AvailabilityBadge } from '../../components/ui/AvailabilityBadge';
 import { MoneyText } from '../../components/ui/MoneyText';
 import { AlpinePressable } from '../../components/ui/AlpinePressable';
@@ -19,6 +18,8 @@ import { ErrorState } from '../../components/feedback/ErrorState';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { useProfile } from '../../hooks/useProfile';
 import { useOwnerListings } from '../../hooks/useListings';
+import { useUserRentals } from '../../hooks/useRentals';
+import { isUserActivelyRenting } from '../../utils/rentalConflict';
 import { spacing, radius } from '../../theme/spacing';
 import { fontFamilies, typeScale } from '../../theme/typography';
 import { rf } from '../../theme/responsiveFont';
@@ -26,7 +27,7 @@ import { formatPresence, formatRelativeTime } from '../../utils/format';
 import { formatMoney } from '../../utils/money';
 import { ROUTES } from '../../constants/routes';
 import { mockReviews, mockProfiles } from '../../mocks/data';
-import { getProfileTrustBadges, profileUsername } from '../../utils/profile';
+import { getProfileTrustBadges } from '../../utils/profile';
 import type { Review } from '../../types/review';
 import type { Listing } from '../../types/listing';
 
@@ -188,13 +189,18 @@ export default function ProfileScreen() {
     refetch: refetchListings,
   } = useOwnerListings(userId ?? '');
 
+  // Anti-sub-letting rule: while this member is actively renting gear, their
+  // own listings are hidden from the app until the rental is returned.
+  const { data: userRentals } = useUserRentals(userId ?? '');
+  const listingsHidden = isUserActivelyRenting(userRentals ?? [], userId ?? '');
+  const visibleListings = listingsHidden ? [] : listings;
+
   const reviews = useMemo(
     () => mockReviews.filter((r) => r.reviewedUserId === userId),
     [userId],
   );
 
   const presence = formatPresence(profile?.lastActiveAt ?? null);
-  const username = useMemo(() => profileUsername(profile ?? { fullName: '' }), [profile]);
   const trustBadges = profile ? getProfileTrustBadges(profile) : [];
   const memberSince = useMemo(() => {
     if (!profile?.createdAt) return '';
@@ -273,109 +279,32 @@ export default function ProfileScreen() {
         contentContainerStyle={{ paddingBottom: spacing.xxxxl, gap: spacing.xxl }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ══ 1. HERO — identity & trust ═══════════════════════════════ */}
+        {/* ══ 1. HERO — common centered profile header ══════════════════ */}
         <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
-          <Card testID="profile-hero-card">
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
-              <Avatar uri={profile.avatarUrl} name={profile.fullName} size="xl" />
-              <View style={{ flex: 1, gap: spacing.xs }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                  <AppText variant="titleMedium" numberOfLines={1} style={{ flexShrink: 1 }}>
-                    {profile.fullName}
-                  </AppText>
-                  {profile.verificationStatus === 'verified' && (
-                    <Ionicons name="checkmark-circle" size={18} color={colors.signalLime} />
-                  )}
-                </View>
-                <AppText variant="monoSmall" color="textSecondary" numberOfLines={1}>
-                  @{username}
-                </AppText>
-                {profile.location && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                    <Ionicons name="location-outline" size={12} color={colors.textTertiary} />
-                    <AppText variant="bodySmall" color="textSecondary" numberOfLines={1}>
-                      {profile.location}
-                    </AppText>
-                  </View>
-                )}
-                {presence && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                    <View
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 4,
-                        backgroundColor: presence.isOnline ? colors.success : colors.textTertiary,
-                      }}
-                    />
-                    <AppText variant="bodySmall" color="textSecondary" numberOfLines={1}>
-                      {presence.label}
-                    </AppText>
-                  </View>
-                )}
-              </View>
-            </View>
-
-            {/* Rating summary */}
-            {profile.ratingAverage !== null && (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: spacing.sm,
-                  marginTop: spacing.lg,
-                }}
-              >
-                <Ionicons name="star" size={16} color={colors.warning} />
-                <Text style={[typeScale.monoBody, { color: colors.textPrimary }]}>
-                  {profile.ratingAverage.toFixed(1)}
-                </Text>
-                <AppText variant="bodySmall" color="textSecondary">
-                  · {profile.ratingCount} review{profile.ratingCount !== 1 ? 's' : ''}
-                </AppText>
-              </View>
-            )}
-
-            {/* Trust badges */}
-            {trustBadges.length > 0 && (
-              <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
-                {trustBadges.map((badge) => (
-                  <Chip key={badge} label={badge} variant="accent" />
-                ))}
-              </View>
-            )}
-
-            {/* Bio */}
-            {profile.bio && (
-              <AppText
-                variant="bodyMedium"
-                color="textSecondary"
-                style={{ marginTop: spacing.lg }}
-              >
-                {profile.bio}
-              </AppText>
-            )}
-
-            {/* Member since */}
-            {memberSince && (
-              <>
-                <Divider marginVertical={spacing.lg} />
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                  <Ionicons name="calendar-outline" size={14} color={colors.textTertiary} />
-                  <AppText variant="bodySmall" color="textSecondary">
-                    Member since {memberSince}
-                  </AppText>
-                </View>
-              </>
-            )}
-          </Card>
+          <ProfileHero
+            testID="profile-hero"
+            name={profile.fullName}
+            avatarUrl={profile.avatarUrl}
+            verified={profile.verificationStatus === 'verified'}
+            location={profile.location}
+            presence={presence}
+            bio={profile.bio}
+            memberSince={memberSince}
+            trustBadges={trustBadges}
+            rating={
+              profile.ratingAverage !== null
+                ? { average: profile.ratingAverage, count: profile.ratingCount }
+                : null
+            }
+            listingCount={listings.length}
+          />
         </View>
 
         {/* ══ 2. GEAR BY {name} ═══════════════════════════════════════ */}
         <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md }}>
           <SectionTitle>
             Gear by {firstName}
-            {listings.length > 0 ? ` (${listings.length})` : ''}
+            {visibleListings.length > 0 ? ` (${visibleListings.length})` : ''}
           </SectionTitle>
 
           {listingsLoading ? (
@@ -389,7 +318,15 @@ export default function ProfileScreen() {
               message="Your connection may have dropped. Try again."
               onRetry={() => refetchListings()}
             />
-          ) : listings.length === 0 ? (
+          ) : listingsHidden ? (
+            <View style={{ minHeight: 220, justifyContent: 'center' }}>
+              <EmptyState
+                icon="shield-outline"
+                title="Listings hidden while renting"
+                description="This member is currently renting gear, so their listings are hidden until their rental is returned."
+              />
+            </View>
+          ) : visibleListings.length === 0 ? (
             <View style={{ minHeight: 220, justifyContent: 'center' }}>
               <EmptyState
                 icon="briefcase-outline"
@@ -399,7 +336,7 @@ export default function ProfileScreen() {
             </View>
           ) : (
             <View style={{ gap: spacing.md }}>
-              {listings.map((listing) => (
+              {visibleListings.map((listing) => (
                 <ListingRow key={listing.id} listing={listing} onPress={openListing} />
               ))}
             </View>

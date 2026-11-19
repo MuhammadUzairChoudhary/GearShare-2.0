@@ -414,19 +414,19 @@ const listingImages: Record<string, ListingImage[]> = {
   ],
   'listing-2': [ // Black Diamond Camalot climbing cams
     gearImage('listing-2', 'img-4', '1522163182402-834f871fd851', 0, 'primary'),
-    gearImage('listing-2', 'img-5', '1518409939535-160b4e65b262', 1, 'gallery'),
+    gearImage('listing-2', 'img-5', '1541625602330-2277a4c46182', 1, 'gallery'),
   ],
   'listing-3': [ // Osprey Atmos backpack
     gearImage('listing-3', 'img-6', '1551632811-561732d1e306', 0, 'primary'),
-    gearImage('listing-3', 'img-7', '1507003212554-3e0e9ae1f18e', 1, 'gallery'),
+    gearImage('listing-3', 'img-7', '1501555088652-021faa106b9b', 1, 'gallery'),
   ],
   'listing-4': [ // Rossignol skis
     gearImage('listing-4', 'img-8', '1551698618-1dfe5d97d256', 0, 'primary'),
     gearImage('listing-4', 'img-9', '1536098561742-ca998e48cbcc', 1, 'gallery'),
   ],
   'listing-5': [ // Dagger kayak
-    gearImage('listing-5', 'img-10', '1464564235832-2f8590d6e2ca', 0, 'primary'),
-    gearImage('listing-5', 'img-11', '1473172709813-4c42ee6f5b31', 1, 'gallery'),
+    gearImage('listing-5', 'img-10', '1544191696-102dbdaeeaa0', 0, 'primary'),
+    gearImage('listing-5', 'img-11', '1501785888041-af3ef285b470', 1, 'gallery'),
   ],
   'listing-6': [ // MSR Hubba Hubba tent
     gearImage('listing-6', 'img-12', '1504280390367-361c6d9f38f4', 0, 'primary'),
@@ -434,27 +434,27 @@ const listingImages: Record<string, ListingImage[]> = {
   ],
   'listing-7': [ // Trek Domane road bike
     gearImage('listing-7', 'img-14', '1485965120184-e220f721d03e', 0, 'primary'),
-    gearImage('listing-7', 'img-15', '1532298229545-e1a6b1f35734', 1, 'gallery'),
+    gearImage('listing-7', 'img-15', '1486870591958-9b9d0d1dda99', 1, 'gallery'),
   ],
   'listing-8': [ // Petzl climbing package
-    gearImage('listing-8', 'img-16', '1518409939535-160b4e65b262', 0, 'primary'),
+    gearImage('listing-8', 'img-16', '1522030299830-16b8d3d049fe', 0, 'primary'),
     gearImage('listing-8', 'img-17', '1522163182402-834f871fd851', 1, 'gallery'),
   ],
   'listing-9': [ // Santa Cruz mountain bike
-    gearImage('listing-9', 'img-18', '1576435771390-0a119c4a0e6d', 0, 'primary'),
-    gearImage('listing-9', 'img-19', '1532298229545-e1a6b1f35734', 1, 'gallery'),
+    gearImage('listing-9', 'img-18', '1571068316344-75bc76f77890', 0, 'primary'),
+    gearImage('listing-9', 'img-19', '1469854523086-cc02fe5d8800', 1, 'gallery'),
   ],
   'listing-10': [ // Garmin inReach
-    gearImage('listing-10', 'img-20', '1507003212554-3e0e9ae1f18e', 0, 'primary'),
+    gearImage('listing-10', 'img-20', '1518770660439-4636190af475', 0, 'primary'),
     gearImage('listing-10', 'img-21', '1551632811-561732d1e306', 1, 'gallery'),
   ],
   'listing-11': [ // Snow Peak cookset
-    gearImage('listing-11', 'img-22', '1478720568472-3057a4f2ae47', 0, 'primary'),
-    gearImage('listing-11', 'img-23', '1510312302820-b446d4ea92d9', 1, 'gallery'),
+    gearImage('listing-11', 'img-22', '1556910103-1c02745aae4d', 0, 'primary'),
+    gearImage('listing-11', 'img-23', '1556228453-efd6c1ff04f6', 1, 'gallery'),
   ],
   'listing-12': [ // Jetboil stove
-    gearImage('listing-12', 'img-24', '1510312302820-b446d4ea92d9', 0, 'primary'),
-    gearImage('listing-12', 'img-25', '1478720568472-3057a4f2ae47', 1, 'gallery'),
+    gearImage('listing-12', 'img-24', '1519671482749-fd09be7ccebf', 0, 'primary'),
+    gearImage('listing-12', 'img-25', '1518733057094-95b53143d2a7', 1, 'gallery'),
   ],
   'listing-13': [ // Camping bundle
     gearImage('listing-13', 'img-26', '1504280390367-361c6d9f38f4', 0, 'primary'),
@@ -800,7 +800,10 @@ export const mockRentals: Rental[] = [
     rentalCharge: 9000,
     fees: 600,
     depositHold: 65000,
-    status: 'active',
+    // Confirmed (upcoming), not yet picked up — the demo user (renter) is not
+    // holding this gear, so their own listings stay visible per the
+    // anti-sub-letting rule.
+    status: 'confirmed',
     createdAt: daysAgo(15),
     updatedAt: daysAgo(5),
     listing: {
@@ -869,6 +872,51 @@ export const mockRentals: Rental[] = [
     listing: mockListings[8]!,
     renter: mockProfiles[0]!,
     owner: mockProfiles[4]!,
+  },
+  // Morgan (user-4) is actively renting Taylor's Santa Cruz (listing-9).
+  // Live demo of the mutual-exclusion rule:
+  //  - rule 1: Morgan's own listings (listing-6/7/8/12) are hidden from browse
+  //  - rule 2: Taylor (owner, listing in active phase) cannot request rentals
+  {
+    id: 'rental-6',
+    listingId: 'listing-9',
+    renterId: 'user-4',
+    ownerId: 'user-5',
+    startDate: daysAgo(2),
+    endDate: daysFromNow(1),
+    pickupWindow: null,
+    returnWindow: null,
+    intendedUse: 'Trail riding in the Boise foothills',
+    rentalCharge: 27000,
+    fees: 2700,
+    depositHold: 150000,
+    status: 'active',
+    createdAt: daysAgo(3),
+    updatedAt: daysAgo(1),
+    listing: mockListings[8]!,
+    renter: mockProfiles[3]!,
+    owner: mockProfiles[4]!,
+  },
+  // Jordan (user-2) has an upcoming confirmed rental of Sam's skis.
+  {
+    id: 'rental-7',
+    listingId: 'listing-4',
+    renterId: 'user-2',
+    ownerId: 'user-3',
+    startDate: daysFromNow(10),
+    endDate: daysFromNow(13),
+    pickupWindow: null,
+    returnWindow: null,
+    intendedUse: 'Ski weekend at Stevens Pass',
+    rentalCharge: 14000,
+    fees: 1400,
+    depositHold: 42000,
+    status: 'confirmed',
+    createdAt: daysAgo(2),
+    updatedAt: daysAgo(1),
+    listing: mockListings[3]!,
+    renter: mockProfiles[1]!,
+    owner: mockProfiles[2]!,
   },
 ];
 

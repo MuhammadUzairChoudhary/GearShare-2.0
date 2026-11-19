@@ -21,7 +21,7 @@ import { ROUTES } from '../../../constants/routes';
 import { getAnalyticsService } from '../../../services/analytics';
 import type { Rental, RentalStatus } from '../../../types/rental';
 
-type FilterTab = 'all' | 'upcoming' | 'past';
+type FilterTab = 'borrowing' | 'lending';
 
 const TERMINAL_STATUSES: RentalStatus[] = ['completed', 'cancelled'];
 const ATTENTION_STATUSES: RentalStatus[] = ['action_required', 'return_due', 'under_review'];
@@ -31,10 +31,12 @@ interface RentalsSection {
   data: Rental[];
 }
 
+// Two tabs split rentals by direction: gear you're borrowing (as renter)
+// vs gear you've lent out (as owner). The tab itself carries the direction,
+// so the cards never need 'from' / 'to' prefixes.
 const FILTER_TABS: { key: FilterTab; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'upcoming', label: 'Upcoming' },
-  { key: 'past', label: 'Past' },
+  { key: 'borrowing', label: 'Borrowing' },
+  { key: 'lending', label: 'Lending' },
 ];
 
 export default function RentalsScreen() {
@@ -48,37 +50,43 @@ export default function RentalsScreen() {
     isFetching,
   } = useUserRentals(isAuthenticated ? (user?.id ?? '') : '');
 
-  const [activeTab, setActiveTab] = useState<FilterTab>('all');
+  const [activeTab, setActiveTab] = useState<FilterTab>('borrowing');
 
   useEffect(() => {
     getAnalyticsService().trackEvent({ name: 'rentals_viewed', params: { filter: activeTab } });
   }, [activeTab]);
 
-  const upcomingRentals = useMemo(
-    () => (rentals ?? []).filter((r) => !TERMINAL_STATUSES.includes(r.status)),
-    [rentals],
+  const borrowingRentals = useMemo(
+    () => (rentals ?? []).filter((r) => r.renterId === user?.id),
+    [rentals, user?.id],
   );
-  const pastRentals = useMemo(
-    () => (rentals ?? []).filter((r) => TERMINAL_STATUSES.includes(r.status)),
-    [rentals],
+  const lendingRentals = useMemo(
+    () => (rentals ?? []).filter((r) => r.ownerId === user?.id),
+    [rentals, user?.id],
   );
   const needsAttentionCount = useMemo(
     () => (rentals ?? []).filter((r) => ATTENTION_STATUSES.includes(r.status)).length,
     [rentals],
   );
 
-  const sections = useMemo<RentalsSection[]>(() => {
-    if (activeTab === 'all') {
-      return [
-        ...(upcomingRentals.length > 0 ? [{ title: 'Upcoming', data: upcomingRentals }] : []),
-        ...(pastRentals.length > 0 ? [{ title: 'Past', data: pastRentals }] : []),
-      ];
-    }
-    if (activeTab === 'upcoming') {
-      return upcomingRentals.length > 0 ? [{ title: 'Upcoming', data: upcomingRentals }] : [];
-    }
-    return pastRentals.length > 0 ? [{ title: 'Past', data: pastRentals }] : [];
-  }, [activeTab, upcomingRentals, pastRentals]);
+  // The active tab's rentals, grouped into Upcoming / Past sections.
+  const activeRentals = activeTab === 'borrowing' ? borrowingRentals : lendingRentals;
+  const upcomingRentals = useMemo(
+    () => activeRentals.filter((r) => !TERMINAL_STATUSES.includes(r.status)),
+    [activeRentals],
+  );
+  const pastRentals = useMemo(
+    () => activeRentals.filter((r) => TERMINAL_STATUSES.includes(r.status)),
+    [activeRentals],
+  );
+
+  const sections = useMemo<RentalsSection[]>(
+    () => [
+      ...(upcomingRentals.length > 0 ? [{ title: 'Upcoming', data: upcomingRentals }] : []),
+      ...(pastRentals.length > 0 ? [{ title: 'Past', data: pastRentals }] : []),
+    ],
+    [upcomingRentals, pastRentals],
+  );
 
   if (authLoading) {
     return (
@@ -142,7 +150,7 @@ export default function RentalsScreen() {
           flexDirection: 'row',
           alignItems: 'center',
           gap: spacing.sm,
-          paddingTop: spacing.xl,
+          paddingTop: spacing.lg,
           paddingBottom: spacing.md,
         }}
       >
@@ -152,6 +160,21 @@ export default function RentalsScreen() {
       </View>
     );
   };
+
+  // Explore/Chat-style filter pills — they scroll with the list.
+  const renderFilterChips = () => (
+    <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+      {FILTER_TABS.map((tab) => (
+        <Chip
+          key={tab.key}
+          label={tab.label}
+          pill
+          variant={activeTab === tab.key ? 'active' : 'default'}
+          onPress={() => setActiveTab(tab.key)}
+        />
+      ))}
+    </View>
+  );
 
   return (
     <Screen>
@@ -164,12 +187,7 @@ export default function RentalsScreen() {
           paddingTop: spacing.xxl,
         }}
       >
-        <View style={{ gap: spacing.xs, flex: 1 }}>
-          <Text style={[typeScale.h1, { color: colors.textPrimary }]}>My Rentals</Text>
-          <Text style={[typeScale.monoSmall, { color: colors.textSecondary }]}>
-            {upcomingRentals.length} upcoming · {pastRentals.length} past
-          </Text>
-        </View>
+        <Text style={[typeScale.h1, { color: colors.textPrimary }]}>My Rentals</Text>
         <NotificationButton />
       </View>
 
@@ -203,56 +221,58 @@ export default function RentalsScreen() {
         </View>
       )}
 
-      {/* ── Filter chips ───────────────────────────────────────────── */}
-      <View style={{ flexDirection: 'row', gap: spacing.sm, marginVertical: spacing.lg }}>
-        {FILTER_TABS.map((tab) => (
-          <Chip
-            key={tab.key}
-            label={tab.label}
-            variant={activeTab === tab.key ? 'active' : 'default'}
-            onPress={() => setActiveTab(tab.key)}
-          />
-        ))}
-      </View>
-
-      {/* ── List / empty states ────────────────────────────────────── */}
+      {/* ── List / empty states — pills above both, scroll with the list ── */}
       {!rentals || rentals.length === 0 ? (
-        <EmptyState
-          icon="calendar-outline"
-          title="No rentals yet"
-          description="Rent gear from nearby owners — requests, pickups, and returns will appear here."
-          actionLabel="Find Gear"
-          onAction={() => router.push(ROUTES.TABS.DISCOVER)}
-        />
-      ) : sections.length === 0 ? (
-        activeTab === 'upcoming' ? (
-          <EmptyState
-            icon="calendar-outline"
-            title="No upcoming rentals"
-            description="Your requests, bookings, and active rentals will appear here."
-            actionLabel="Find Gear"
-            onAction={() => router.push(ROUTES.TABS.DISCOVER)}
-          />
-        ) : (
-          <EmptyState
-            icon="time-outline"
-            title="No past rentals"
-            description="Completed and cancelled rentals appear here for reference."
-          />
-        )
+        <View style={{ marginTop: spacing.lg }}>
+          {renderFilterChips()}
+          <View style={{ marginTop: spacing.xxxl }}>
+            <EmptyState
+              icon="calendar-outline"
+              title="No rentals yet"
+              description="Rent gear from nearby owners — requests, pickups, and returns will appear here."
+              actionLabel="Find Gear"
+              onAction={() => router.push(ROUTES.TABS.DISCOVER)}
+            />
+          </View>
+        </View>
+      ) : activeRentals.length === 0 ? (
+        <View style={{ marginTop: spacing.lg }}>
+          {renderFilterChips()}
+          <View style={{ marginTop: spacing.xxxl }}>
+            {activeTab === 'borrowing' ? (
+              <EmptyState
+                icon="bag-handle-outline"
+                title="Nothing borrowed yet"
+                description="Gear you're renting from owners — requests, pickups, and returns will appear here."
+                actionLabel="Find Gear"
+                onAction={() => router.push(ROUTES.TABS.DISCOVER)}
+              />
+            ) : (
+              <EmptyState
+                icon="pricetag-outline"
+                title="Nothing lent out yet"
+                description="When someone books your listed gear, the rental will appear here."
+                actionLabel="List Gear"
+                onAction={() => router.push('/owner/listing/new')}
+              />
+            )}
+          </View>
+        </View>
       ) : (
         <SectionList
           sections={sections}
           keyExtractor={(item: Rental) => item.id}
           renderItem={({ item }) => (
-            <View style={{ marginBottom: spacing.lg }}>
-              <RentalSummaryCard
-                rental={item}
-                currentUserId={user?.id}
-                onPress={() => handleRentalPress(item.id)}
-              />
-            </View>
+            <RentalSummaryCard
+              rental={item}
+              role={activeTab === 'borrowing' ? 'renter' : 'owner'}
+              onPress={() => handleRentalPress(item.id)}
+            />
           )}
+          ItemSeparatorComponent={() => <View style={{ height: spacing.lg }} />}
+          ListHeaderComponent={
+            <View style={{ marginVertical: spacing.lg }}>{renderFilterChips()}</View>
+          }
           renderSectionHeader={renderSectionHeader}
           stickySectionHeadersEnabled={false}
           showsVerticalScrollIndicator={false}

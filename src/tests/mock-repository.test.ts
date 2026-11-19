@@ -52,6 +52,14 @@ describe('Mock Repositories', () => {
       expect(saved.length).toBeGreaterThan(0);
       expect(saved.every((l) => l.publishedStatus === 'published')).toBe(true);
     });
+
+    it('should hide listings of members who are actively renting', async () => {
+      // user-4 is actively renting (mock rental-6) → their listings are hidden.
+      const listings = await repo.getFeaturedListings();
+      expect(listings.some((l) => l.ownerId === 'user-4')).toBe(false);
+      // user-1 is not mid-rental → their listings stay visible.
+      expect(listings.some((l) => l.ownerId === 'user-1')).toBe(true);
+    });
   });
 
   describe('MockRentalsRepository', () => {
@@ -77,6 +85,32 @@ describe('Mock Repositories', () => {
       });
       expect(rental.id).toBeDefined();
       expect(rental.status).toBe('request_sent');
+    });
+
+    it('should reject requests while the requester has a listing in the active phase', async () => {
+      const freshRepo = new MockRentalsRepository();
+      // user-5 owns listing-9, which mock rental-6 has currently rented out.
+      await expect(
+        freshRepo.createRentalRequest({
+          listingId: 'listing-1',
+          startDate: '2026-10-01',
+          endDate: '2026-10-05',
+          renterId: 'user-5',
+        }),
+      ).rejects.toThrow(/currently being rented out/);
+    });
+
+    it('should reject requests to a listing whose owner is actively renting', async () => {
+      const freshRepo = new MockRentalsRepository();
+      // user-4 (owner of listing-7) is actively renting via mock rental-6.
+      await expect(
+        freshRepo.createRentalRequest({
+          listingId: 'listing-7',
+          startDate: '2026-10-01',
+          endDate: '2026-10-05',
+          renterId: 'user-2',
+        }),
+      ).rejects.toThrow(/temporarily unavailable/);
     });
   });
 

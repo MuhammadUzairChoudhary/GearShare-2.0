@@ -20,6 +20,7 @@ import { useRental } from '../../hooks/useRentals';
 import { useListing } from '../../hooks/useListings';
 import { ROUTES } from '../../constants/routes';
 import { formatMoney } from '../../utils/money';
+import { formatDateRange } from '../../utils/format';
 import type { RentalStatus, Rental } from '../../types/rental';
 
 const STATUS_STEPS: { label: string; key: string }[] = [
@@ -227,7 +228,7 @@ function RentalCalendar({ startDate, endDate, onSelectDate, onDone, disabled }: 
       <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#ECEEEF', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
         <View style={{ flex: 1 }}>
           <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.5, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }} numberOfLines={1}>
-            {endDate ? `${fmtShort(startDate)} — ${fmtShort(endDate)}` : fmtShort(startDate)}
+            {endDate ? formatDateRange(startDate, endDate) : fmtShort(startDate)}
           </Text>
           <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(9), lineHeight: rf(13), color: 'rgba(44,48,52,0.5)', marginTop: 1 }} numberOfLines={1}>
             {endDate ? `${rangeDays} day${rangeDays !== 1 ? 's' : ''} selected` : 'Tap again to set your end date'}
@@ -719,7 +720,7 @@ export default function RentalDetailScreen() {
                             <View style={{ flex: 1 }}>
                               <Text style={{ fontFamily: fontFamilies.inter.bold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>DATES</Text>
                               <Text numberOfLines={1} style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(13), lineHeight: rf(18), color: requestSent ? 'rgba(44,48,52,0.4)' : '#1F2225', marginTop: 2 }}>
-                                {rentalRange.end ? `${fmtDate(startDateStr)} — ${fmtDate(endDateStr)}` : fmtDate(startDateStr)}
+                                {rentalRange.end ? formatDateRange(startDateStr, endDateStr) : fmtDate(startDateStr)}
                               </Text>
                               <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(9), lineHeight: rf(13), color: 'rgba(44,48,52,0.5)', marginTop: 2 }}>
                                 ({demoRentalDays} day{demoRentalDays !== 1 ? 's' : ''})
@@ -841,7 +842,7 @@ export default function RentalDetailScreen() {
                               <View>
                                 <Text style={{ fontFamily: fontFamilies.ibmPlexMono.semiBold, fontSize: rf(8), lineHeight: rf(12), letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(44,48,52,0.4)' }}>Rental Dates</Text>
                                 <Text style={{ fontFamily: fontFamilies.spaceGrotesk.bold, fontSize: rf(14), lineHeight: rf(20), color: '#1F2225', marginTop: 2 }}>
-                                  {fmtDate(startDateStr)} - {fmtDate(endDateStr)}
+                                  {formatDateRange(startDateStr, endDateStr)}
                                 </Text>
                                 <Text style={{ fontFamily: fontFamilies.inter.semiBold, fontSize: rf(9), lineHeight: rf(13), color: 'rgba(44,48,52,0.5)', marginTop: 2 }}>{daysDiff} FULL DAYS</Text>
                               </View>

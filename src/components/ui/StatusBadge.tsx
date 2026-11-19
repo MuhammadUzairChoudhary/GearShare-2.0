@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, type ViewStyle } from 'react-native';
-import { useTheme } from '../../theme/ThemeContext';
 import { typography } from '../../theme/typography';
 import { spacing, radius } from '../../theme/spacing';
 import type { RentalStatusVariant } from '../../types/rental';
@@ -23,7 +22,6 @@ const STATUS_COLORS: Record<BadgeVariant, { bg: string; text: string; dot: strin
 };
 
 export function StatusBadge({ label, variant = 'neutral', testID }: StatusBadgeProps) {
-  const { colors } = useTheme();
   const colors_ = STATUS_COLORS[variant];
 
   const badgeStyle: ViewStyle = {

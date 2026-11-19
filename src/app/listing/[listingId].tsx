@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { View, Animated, TouchableOpacity, Text, StatusBar, Dimensions } from 'react-native';
+import { View, Animated, TouchableOpacity, Text, StatusBar, Dimensions, Image, ScrollView } from 'react-native';
 import { Stack, useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppIcon } from '../../components/ui/Icons';
@@ -22,8 +22,10 @@ export default function ListingDetailScreen() {
   const { isAuthenticated, setPendingAction } = useAuthContext();
   const { data: listing, isLoading, isError, refetch } = useListing(listingId ?? '');
   const [isSaved, setIsSaved] = useState(false);
+  const [heroIndex, setHeroIndex] = useState(0);
 
     const IMAGE_HEIGHT = Dimensions.get('window').height * 0.4;
+    const SCREEN_WIDTH = Dimensions.get('window').width;
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -128,6 +130,7 @@ export default function ListingDetailScreen() {
   const gear = listing.gearItem;
   const owner = listing.owner;
   const estTotal = listing.dailyPrice * 3;
+  const heroImages = [...(listing.images ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -181,18 +184,44 @@ export default function ListingDetailScreen() {
         )}
         scrollEventThrottle={16}
       >
-        {/* ── Hero Image — 2/5 of screen height ──────────────────── */}
+        {/* ── Hero Image gallery — 2/5 of screen height ──────────── */}
         <View style={{ width: '100%', height: IMAGE_HEIGHT, backgroundColor: '#DDE1E3' }}>
-          {/* Placeholder image */}
-          <View style={{ flex: 1, backgroundColor: colors.graphite300, opacity: 0.3 }} />
+          {heroImages.length > 0 ? (
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={(e) => {
+                const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+                setHeroIndex(index);
+              }}
+            >
+              {heroImages.map((img) => (
+                <View key={img.id} style={{ width: SCREEN_WIDTH, height: IMAGE_HEIGHT }}>
+                  <Image
+                    source={{ uri: img.storagePath }}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="cover"
+                    accessibilityLabel={`${gear?.name ?? 'Listing'} photo ${heroImages.indexOf(img) + 1}`}
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={{ flex: 1, backgroundColor: colors.graphite300, opacity: 0.3 }} />
+          )}
 
           {/* Pagination dots */}
-          <View style={{ position: 'absolute', bottom: 24, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: 'rgba(31,34,37,0.3)', borderRadius: 9999 }}>
-            <View style={{ width: 6, height: 6, backgroundColor: '#C8FF3D', borderRadius: 9999 }} />
-            <View style={{ width: 6, height: 6, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 9999 }} />
-            <View style={{ width: 6, height: 6, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 9999 }} />
-            <View style={{ width: 6, height: 6, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 9999 }} />
-          </View>
+          {heroImages.length > 1 && (
+            <View style={{ position: 'absolute', bottom: 24, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: 'rgba(31,34,37,0.3)', borderRadius: 9999 }}>
+              {heroImages.map((_, i) => (
+                <View
+                  key={i}
+                  style={{ width: 6, height: 6, borderRadius: 9999, backgroundColor: i === heroIndex ? '#C8FF3D' : 'rgba(255,255,255,0.5)' }}
+                />
+              ))}
+            </View>
+          )}
         </View>
         {/* ── Listing Info ─────────────────────────────────────────── */}
         <View style={{ paddingHorizontal: spacing.xl, paddingTop: 32, gap: 16 }}>

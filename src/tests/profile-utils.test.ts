@@ -21,10 +21,8 @@ function makeProfile(overrides: Partial<Profile> = {}): Profile {
 }
 
 describe('getProfileTrustBadges', () => {
-  it('returns Verified Member for verified identities', () => {
-    expect(getProfileTrustBadges(makeProfile({ verificationStatus: 'verified' }))).toEqual([
-      'Verified Member',
-    ]);
+  it('does not badge verification alone — the blue tick conveys it', () => {
+    expect(getProfileTrustBadges(makeProfile({ verificationStatus: 'verified' }))).toEqual([]);
   });
 
   it('returns Super Host only for seasoned owners (10+ reviews, 4.5★+)', () => {
@@ -36,14 +34,14 @@ describe('getProfileTrustBadges', () => {
     expect(getProfileTrustBadges(makeProfile(base))).toEqual(['Super Host']);
   });
 
-  it('combines Verified Member and Super Host', () => {
+  it('awards Super Host to seasoned verified owners', () => {
     const profile = makeProfile({
       verificationStatus: 'verified',
       isOwner: true,
       ratingCount: 24,
       ratingAverage: 4.8,
     });
-    expect(getProfileTrustBadges(profile)).toEqual(['Verified Member', 'Super Host']);
+    expect(getProfileTrustBadges(profile)).toEqual(['Super Host']);
   });
 
   it('does not award Super Host to low-volume or low-rated owners', () => {

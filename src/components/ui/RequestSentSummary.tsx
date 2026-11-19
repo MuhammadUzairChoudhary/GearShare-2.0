@@ -8,6 +8,7 @@ import { MoneyText } from './MoneyText';
 import { Divider } from './Divider';
 import { Card } from './Card';
 import type { Rental } from '../../types/rental';
+import { formatDateRange } from '../../utils/format';
 
 interface RequestSentSummaryProps {
   rental: Rental;
@@ -66,7 +67,7 @@ export function RequestSentSummary({ rental, testID }: RequestSentSummaryProps) 
               Dates
             </AppText>
             <AppText variant="bodyMedium" mono>
-              {rental.startDate} – {rental.endDate}
+              {formatDateRange(rental.startDate, rental.endDate)}
             </AppText>
           </View>
           <Divider />

@@ -1,6 +1,7 @@
 import type { Rental, CreateRentalRequestInput, UpdateRentalInput } from '../types/rental';
 import { mockRentals, mockListings } from '../mocks/data';
 import { generateId } from '../utils/format';
+import { isUserActivelyHosting, isUserActivelyRenting } from '../utils/rentalConflict';
 
 export interface RentalsRepository {
   getUserRentals(userId: string): Promise<Rental[]>;
@@ -25,6 +26,22 @@ export class MockRentalsRepository implements RentalsRepository {
     if (!listing) throw new Error('Listing not found');
     if (listing.availabilityStatus !== 'available') {
       throw new Error('Listing is not available');
+    }
+    // Anti-sub-letting rule (mutual exclusion), enforced at the trust boundary
+    // so saved/deep-linked listings can't bypass the browse-side filters:
+    // 1. While one of the requester's own listings is rented out, they cannot
+    //    request rentals themselves.
+    if (isUserActivelyHosting(this.rentals, input.renterId)) {
+      throw new Error(
+        'One of your listings is currently being rented out, so you cannot request a new rental until it is returned.',
+      );
+    }
+    // 2. While the listing's owner is actively renting gear themselves, their
+    //    listings are unavailable.
+    if (isUserActivelyRenting(this.rentals, listing.ownerId)) {
+      throw new Error(
+        'This owner is currently renting gear themselves, so their listings are temporarily unavailable.',
+      );
     }
 
     const startDate = new Date(input.startDate);

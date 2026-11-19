@@ -1,19 +1,35 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, ScrollView, RefreshControl, Text } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  View,
+  RefreshControl,
+  Text,
+  Image,
+  Share,
+  Animated,
+  useWindowDimensions,
+  type NativeSyntheticEvent,
+  type NativeScrollEvent,
+} from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthContext } from '../../../features/auth/AuthProvider';
 import { Screen } from '../../../components/ui/Screen';
-import { NotificationButton } from '../../../components/ui/NotificationButton';
 import { AppText } from '../../../components/ui/AppText';
 import { AppButton } from '../../../components/ui/AppButton';
 import { AlpineDialog } from '../../../components/ui/AlpineDialog';
 import { Card } from '../../../components/ui/Card';
-import { Avatar } from '../../../components/ui/Avatar';
 import { Divider } from '../../../components/ui/Divider';
-import { Chip } from '../../../components/ui/Chip';
 import { StatusBadge } from '../../../components/ui/StatusBadge';
+import { ProfileHero } from '../../../components/ui/ProfileHero';
+import { Avatar } from '../../../components/ui/Avatar';
 import { AlpinePressable } from '../../../components/ui/AlpinePressable';
+import {
+  OptionsMenu,
+  OptionsMenuItem,
+  OptionsMenuTrigger,
+  type OptionsMenuTriggerHandle,
+} from '../../../components/ui/OptionsMenu';
 import { LoadingState } from '../../../components/feedback/LoadingState';
 import { ErrorState } from '../../../components/feedback/ErrorState';
 import { useProfile } from '../../../hooks/useProfile';
@@ -22,15 +38,15 @@ import { useOwnerListings, useSavedListings } from '../../../hooks/useListings';
 import { usePaymentMethods } from '../../../hooks/usePayments';
 import { useToast } from '../../../providers/ToastProvider';
 import { spacing, radius } from '../../../theme/spacing';
-import { typeScale } from '../../../theme/typography';
+import { fontFamilies, typeScale } from '../../../theme/typography';
+import { rf } from '../../../theme/responsiveFont';
+import { usePrefersReducedMotion } from '../../../theme/motion';
 import { useTheme } from '../../../theme/ThemeContext';
 import { ROUTES } from '../../../constants/routes';
 import { getAnalyticsService } from '../../../services/analytics';
 import { formatMoney } from '../../../utils/money';
 import { getProfileTrustBadges } from '../../../utils/profile';
 import type { VerificationStatus } from '../../../types/profile';
-
-type AccountMode = 'hosting' | 'renting';
 
 // ── Verification status → explicit, actionable trust language ────────────
 const VERIFICATION_LABELS: Record<
@@ -63,6 +79,30 @@ const VERIFICATION_LABELS: Record<
 const DEPOSIT_HOLDING_STATUSES = ['confirmed', 'pickup_due', 'active', 'return_due'];
 // Statuses that count toward hosting earnings.
 const EARNING_STATUSES = ['confirmed', 'active', 'completed'];
+
+// Profile cover — Alpine landscape placeholder until real cover uploads exist.
+// Same Unsplash URL style as the listing photos in mocks/data.ts.
+const COVER_IMAGE_URL =
+  'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&h=500&fit=crop&auto=format';
+
+// ── Collapsible-header geometry (keep in sync with the hero layout) ──────
+// The cover, avatar overlap, and avatar size below are used both in the hero
+// markup and the morph math, so they can't drift apart.
+const COVER_HEIGHT = 136;
+const HERO_AVATAR_OVERLAP = 52;
+const HERO_AVATAR_SIZE = 96;
+const HEADER_ROW_HEIGHT = 56;
+const COLLAPSED_AVATAR_SIZE = 40;
+// scrollY at which the header avatar copy has fully shrunk into the corner.
+const TRAVEL_END = 150;
+// Restrained ease-out curve for the travel: the picture advances quickly at
+// first and decelerates as it settles into the corner — no overshoot.
+const TRAVEL_EASE_STOPS = [0, 0.2, 0.4, 0.6, 0.8, 1] as const;
+const travelEase = (f: number) => 1 - (1 - f) * (1 - f);
+// Resting position of the hero avatar's top-left inside the scroll content
+// (cover + content gap − overlap). Used only as a pre-measure fallback —
+// the real position is measured at runtime via avatarRef.measureInWindow.
+const HERO_AVATAR_TOP = COVER_HEIGHT + spacing.lg - HERO_AVATAR_OVERLAP;
 
 interface MenuRowProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -153,6 +193,9 @@ function RowDivider() {
 
 export default function AccountScreen() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const reducedMotion = usePrefersReducedMotion();
+  const { width: screenWidth } = useWindowDimensions();
   const { showToast } = useToast();
   const { isAuthenticated, isLoading: authLoading, user, signOut } = useAuthContext();
   const userId = isAuthenticated ? (user?.id ?? '') : '';
@@ -184,44 +227,147 @@ export default function AccountScreen() {
     refetch: refetchPayments,
   } = usePaymentMethods(isAuthenticated);
 
-  // Mode default follows the profile once loaded (hosting for owners).
-  const [mode, setMode] = useState<AccountMode>('hosting');
-  const [modeInitialized, setModeInitialized] = useState(false);
   // Sign-out confirmation — interrupts the session, so it asks first.
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
+  // Profile options (Edit / Share) — anchored under the 3-dot trigger.
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [optionsAnchorTop, setOptionsAnchorTop] = useState(96);
+  const optionsTriggerRef = useRef<OptionsMenuTriggerHandle>(null);
+
+  // ── Collapsible header — scroll-driven, same pattern as the gear-detail page ──
+  // The value is JS-driven (setValue on scroll) so every derived opacity AND
+  // transform updates reliably on all platforms and devices.
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  // The morph copy must rest EXACTLY over the in-content avatar. Its origin is
+  // measured RELATIVE to the scroll-area wrapper (a frame this screen owns), so
+  // it shares the morph's coordinate space — window/status-bar offsets and
+  // navigator chrome can never skew it.
+  const avatarRef = useRef<View>(null);
+  const scrollAreaRef = useRef<View>(null);
+  const [avatarBox, setAvatarBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  // Once the page scrolls, the in-content avatar hides and its header-layer
+  // copy takes over — so only ONE image is ever visible.
+  const [scrolled, setScrolled] = useState(false);
+  const scrolledRef = useRef(false);
+
+  const measureAvatar = useCallback(() => {
+    const node = avatarRef.current;
+    const area = scrollAreaRef.current;
+    if (!node || !area) return;
+    node.measureLayout(
+      area,
+      (x, y, w, h) => {
+        if (w > 0 && h > 0) {
+          setAvatarBox((prev) =>
+            prev && prev.x === x && prev.y === y && prev.w === w && prev.h === h
+              ? prev
+              : { x, y, w, h },
+          );
+        }
+      },
+      () => {
+        // Layout not ready yet — retry shortly.
+        setTimeout(measureAvatar, 120);
+      },
+    );
+  }, []);
+
+  const handleScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const y = e.nativeEvent.contentOffset.y;
+      scrollY.setValue(y);
+      // Refresh the origin whenever the user is back at the top.
+      if (y < 2) measureAvatar();
+      const isScrolled = y > 4;
+      if (isScrolled !== scrolledRef.current) {
+        scrolledRef.current = isScrolled;
+        setScrolled(isScrolled);
+      }
+    },
+    [scrollY, measureAvatar],
+  );
+
+  useEffect(() => {
+    if (authLoading || profileLoading || rentalsLoading || !profile) return;
+    measureAvatar();
+    // Re-measure once layout settles and on rotation.
+    const t = setTimeout(measureAvatar, 250);
+    return () => clearTimeout(t);
+  }, [measureAvatar, authLoading, profileLoading, rentalsLoading, profile, screenWidth]);
+
+  // White surface fades in as the hero scrolls under it (no hairline — the
+  // surface blends into the white page, so no border is ever drawn).
+  const headerBgOpacity = scrollY.interpolate({
+    inputRange: [0, 100],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  // Collapsed name appears beside the shrunk avatar (after the in-content
+  // name has faded, so the two never read as a duplicate).
+  const headerNameOpacity = scrollY.interpolate({
+    inputRange: [120, TRAVEL_END],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  const headerNameTranslateY = scrollY.interpolate({
+    inputRange: [120, TRAVEL_END],
+    outputRange: [8, 0],
+    extrapolate: 'clamp',
+  });
+  // The in-content name fades as the header name appears.
+  const nameOpacity = scrollY.interpolate({
+    inputRange: [80, 120],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+  // Header-copy origin — the in-content avatar's measured box (or the layout
+  // guess while the measurement is pending; the copy isn't rendered until the
+  // box is measured). The copy starts there, then travels to the corner.
+  const origin = avatarBox ?? {
+    x: screenWidth / 2 - HERO_AVATAR_SIZE / 2,
+    y: HERO_AVATAR_TOP,
+    w: HERO_AVATAR_SIZE,
+    h: HERO_AVATAR_SIZE,
+  };
+  const originCx = origin.x + origin.w / 2;
+  const originCy = origin.y + origin.h / 2;
+
+  // ONE image does the animation: once the page scrolls, the in-content
+  // avatar hides and its copy (in the header layer, above the white surface)
+  // takes over from the exact same spot — then gently shrinks and slides
+  // into the top-left corner by TRAVEL_END, easing out as it arrives.
+  const travelInput = TRAVEL_EASE_STOPS.map((f) => f * TRAVEL_END);
+  const headerAvatarScale = scrollY.interpolate({
+    inputRange: travelInput,
+    outputRange: TRAVEL_EASE_STOPS.map(
+      (f) => 1 + (COLLAPSED_AVATAR_SIZE / HERO_AVATAR_SIZE - 1) * travelEase(f),
+    ),
+    extrapolate: 'clamp',
+  });
+  const headerAvatarTranslateX = scrollY.interpolate({
+    inputRange: travelInput,
+    outputRange: TRAVEL_EASE_STOPS.map(
+      (f) => (spacing.lg + COLLAPSED_AVATAR_SIZE / 2 - originCx) * travelEase(f),
+    ),
+    extrapolate: 'clamp',
+  });
+  const headerAvatarTranslateY = scrollY.interpolate({
+    inputRange: travelInput,
+    outputRange: TRAVEL_EASE_STOPS.map(
+      (f) => (insets.top + HEADER_ROW_HEIGHT / 2 - originCy) * travelEase(f),
+    ),
+    extrapolate: 'clamp',
+  });
 
   useEffect(() => {
     getAnalyticsService().trackEvent({ name: 'profile_viewed' });
   }, []);
 
-  useEffect(() => {
-    if (!modeInitialized && profile) {
-      setMode(profile.isOwner ? 'hosting' : 'renting');
-      setModeInitialized(true);
-    }
-  }, [profile, modeInitialized]);
-
   const verification = useMemo(() => {
     const status: VerificationStatus = profile?.verificationStatus ?? 'unverified';
     return VERIFICATION_LABELS[status];
   }, [profile?.verificationStatus]);
-
-  const memberSince = useMemo(() => {
-    if (!profile?.createdAt) return '';
-    return new Date(profile.createdAt).toLocaleDateString('en-US', {
-      month: 'long',
-      year: 'numeric',
-    });
-  }, [profile?.createdAt]);
-
-  const username = useMemo(
-    () =>
-      (profile?.fullName ?? 'user')
-        .toLowerCase()
-        .replace(/\s+/g, '.')
-        .replace(/[^a-z0-9.]/g, ''),
-    [profile?.fullName],
-  );
 
   // Trust badges derived from real profile data.
   const trustBadges = useMemo(() => (profile ? getProfileTrustBadges(profile) : []), [profile]);
@@ -256,6 +402,11 @@ export default function AccountScreen() {
 
   const handleSignOutPress = () => setShowSignOutDialog(true);
 
+  const handleOpenOptions = useCallback(() => {
+    setOptionsAnchorTop(optionsTriggerRef.current?.getAnchorTop() ?? 96);
+    setShowOptionsMenu(true);
+  }, []);
+
   const confirmSignOut = async () => {
     setShowSignOutDialog(false);
     const result = await signOut();
@@ -270,6 +421,20 @@ export default function AccountScreen() {
     showToast(`${label} is coming in the full release`, 'info');
   };
 
+  // Share Profile — opens the native share sheet with a link-style message.
+  const handleShareProfile = useCallback(async () => {
+    const name = profile?.fullName ?? 'this member';
+    const location = profile?.location ? ` in ${profile.location}` : '';
+    try {
+      await Share.share({
+        message: `Check out ${name}${location} on GearShare — rent and lend outdoor gear.`,
+      });
+      getAnalyticsService().trackEvent({ name: 'profile_shared', params: { userId } });
+    } catch {
+      showToast('Could not open the share sheet', 'error');
+    }
+  }, [profile, userId, showToast]);
+
   const isRefreshing = rentalsFetching || listingsFetching || savedFetching;
   const onRefresh = () => {
     refetchProfile();
@@ -277,11 +442,6 @@ export default function AccountScreen() {
     refetchListings();
     refetchSaved();
     refetchPayments();
-  };
-
-  const switchMode = (next: AccountMode) => {
-    setMode(next);
-    getAnalyticsService().trackEvent({ name: 'profile_mode_toggled', params: { mode: next } });
   };
 
   if (authLoading || profileLoading || rentalsLoading) {
@@ -327,10 +487,34 @@ export default function AccountScreen() {
   const rentalCount = rentals?.length ?? 0;
 
   return (
-    <Screen>
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: spacing.xxxxl, gap: spacing.lg }}
+    // `safeArea={false}` lets the cover run behind the status bar — the
+    // options trigger still positions itself below the inset via `insets`.
+    <Screen padded={false} safeArea={false}>
+      {/* Options — replaces the notification bell; Edit / Share menu */}
+      <View
+        style={{ position: 'absolute', top: insets.top + spacing.sm, right: spacing.lg, zIndex: 20 }}
+      >
+        <OptionsMenuTrigger
+          ref={optionsTriggerRef}
+          onPress={handleOpenOptions}
+          accessibilityLabel="Profile options"
+          testID="profile-options-trigger"
+        />
+      </View>
+
+      {/* Horizontal padding lives on the content so the cover can bleed
+          full-width via its negative margin (a padded Screen would clip it).
+          The wrapper gives the morph measurement a stable coordinate frame. */}
+      <View ref={scrollAreaRef} style={{ flex: 1 }}>
+      <Animated.ScrollView
+        contentContainerStyle={{
+          paddingBottom: spacing.xxxxl,
+          gap: spacing.lg,
+          paddingHorizontal: spacing.lg,
+        }}
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -340,185 +524,84 @@ export default function AccountScreen() {
           />
         }
       >
-        {/* ── Header ─────────────────────────────────────────────────── */}
+        {/* ── Cover — background image replaces the old title header ── */}
         <View
           style={{
-            flexDirection: 'row',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            paddingTop: spacing.xxl,
+            height: COVER_HEIGHT,
+            marginHorizontal: -spacing.lg,
+            backgroundColor: colors.surface,
           }}
         >
-          <View style={{ gap: spacing.xs, flex: 1 }}>
-            <Text style={[typeScale.h1, { color: colors.textPrimary }]}>Account</Text>
-            <Text style={[typeScale.monoSmall, { color: colors.textSecondary }]}>
-              {memberSince ? `Member since ${memberSince}` : 'Account'}
-            </Text>
-          </View>
-          <NotificationButton />
+          <Image
+            source={{ uri: COVER_IMAGE_URL }}
+            style={{ width: '100%', height: '100%' }}
+            resizeMode="cover"
+            accessibilityRole="image"
+            accessibilityLabel="Profile cover photo"
+          />
         </View>
 
-        {/* ══ 1. HERO — identity & trust ═══════════════════════════════ */}
-        <Card testID="profile-hero-card">
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
-            <Avatar uri={profile?.avatarUrl ?? null} name={profile?.fullName ?? 'User'} size="xl" />
-            <View style={{ flex: 1, gap: spacing.xs }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                <AppText variant="titleMedium" numberOfLines={1} style={{ flexShrink: 1 }}>
-                  {profile?.fullName ?? user?.user_metadata?.full_name ?? 'User'}
-                </AppText>
-                {profile?.verificationStatus === 'verified' && (
-                  <Ionicons name="checkmark-circle" size={18} color={colors.signalLime} />
-                )}
-              </View>
-              <AppText variant="monoSmall" color="textSecondary" numberOfLines={1}>
-                @{username}
-              </AppText>
-              {profile?.location && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                  <Ionicons name="location-outline" size={12} color={colors.textTertiary} />
-                  <AppText variant="bodySmall" color="textSecondary" numberOfLines={1}>
-                    {profile.location}
-                  </AppText>
-                </View>
-              )}
-            </View>
-          </View>
+        {/* ══ 1. HERO — common centered profile header ══════════════════ */}
+        <ProfileHero
+          testID="profile-hero"
+          name={profile?.fullName ?? user?.user_metadata?.full_name ?? 'User'}
+          avatarUrl={profile?.avatarUrl ?? null}
+          verified={profile?.verificationStatus === 'verified'}
+          location={profile?.location ?? null}
+          bio={profile?.bio ?? null}
+          trustBadges={trustBadges}
+          rating={
+            profile?.ratingAverage != null
+              ? { average: profile.ratingAverage, count: profile.ratingCount }
+              : null
+          }
+          listingCount={listingCount}
+          coverOverlap={HERO_AVATAR_OVERLAP}
+          avatarHidden={scrolled}
+          nameFadeOpacity={nameOpacity}
+          avatarRef={avatarRef}
+        />
 
-          {/* Rating summary */}
-          {profile?.ratingAverage != null && (
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: spacing.sm,
-                marginTop: spacing.lg,
-              }}
-            >
-              <Ionicons name="star" size={16} color={colors.warning} />
-              <Text style={[typeScale.monoBody, { color: colors.textPrimary }]}>
-                {profile.ratingAverage.toFixed(1)}
-              </Text>
-              <AppText variant="bodySmall" color="textSecondary">
-                · {profile.ratingCount} review{profile.ratingCount !== 1 ? 's' : ''}
-              </AppText>
-            </View>
-          )}
-
-          {/* Trust badges */}
-          {trustBadges.length > 0 && (
-            <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
-              {trustBadges.map((badge) => (
-                <Chip key={badge} label={badge} variant="accent" />
-              ))}
-            </View>
-          )}
-
-          {/* Public profile preview */}
-          <Divider marginVertical={spacing.lg} />
-          <AlpinePressable
-            onPress={() => router.push(ROUTES.PROFILE(userId))}
-            pressedStyle={{ opacity: 0.7 }}
-            accessibilityRole="link"
-            accessibilityLabel="View public profile"
-          >
-            <View
-              style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}
-            >
-              <Ionicons name="person-outline" size={16} color={colors.textPrimary} />
-              <AppText variant="labelMedium">View Public Profile</AppText>
-              <Ionicons name="chevron-forward" size={14} color={colors.textTertiary} />
-            </View>
-          </AlpinePressable>
+        {/* ══ 2. HOSTING & RENTING — both sides of the marketplace ════ */}
+        <SectionTitle>Hosting & Renting</SectionTitle>
+        <Card padded={false} testID="profile-marketplace-card">
+          <MenuRow
+            icon="briefcase-outline"
+            title="My Gear Listings"
+            subtitle={`${listingCount} active listing${listingCount !== 1 ? 's' : ''}`}
+            onPress={() => router.push(ROUTES.OWNER.INDEX)}
+            testID="manage-listings-row"
+          />
+          <RowDivider />
+          <MenuRow
+            icon="add-circle-outline"
+            title="List New Gear"
+            subtitle="Create a listing for your equipment"
+            onPress={() => router.push(ROUTES.OWNER.NEW_LISTING)}
+            testID="list-new-gear-row"
+          />
+          <RowDivider />
+          <MenuRow
+            icon="wallet-outline"
+            title="Earnings & Payouts"
+            subtitle={`${formatMoney(earningsMinor)} earned to date`}
+            onPress={() => router.push(ROUTES.OWNER.INDEX)}
+          />
+          <RowDivider />
+          <MenuRow
+            icon="heart-outline"
+            title="Saved Gear"
+            subtitle={`${savedCount} saved item${savedCount !== 1 ? 's' : ''}`}
+            onPress={() => handlePlaceholder('Saved gear')}
+          />
+          <RowDivider />
+          <MenuRow
+            icon="receipt-outline"
+            title="Rental History & Receipts"
+            subtitle={`${rentalCount} rental${rentalCount !== 1 ? 's' : ''} on file`}
+            onPress={() => router.push(ROUTES.TABS.RENTALS)}
+          />
         </Card>
-
-        {/* ══ 2. MODE TOGGLE ══════════════════════════════════════════ */}
-        <Card padded={false} testID="profile-mode-toggle">
-          <View style={{ flexDirection: 'row', padding: spacing.xs, gap: spacing.xs }}>
-            {(['hosting', 'renting'] as const).map((m) => {
-              const active = mode === m;
-              return (
-                <AlpinePressable
-                  key={m}
-                  onPress={() => switchMode(m)}
-                  pressedScale={0.99}
-                  style={{
-                    flex: 1,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: 44,
-                    borderRadius: radius.input,
-                    backgroundColor: active ? colors.carbon950 : 'transparent',
-                  }}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                  accessibilityLabel={m === 'hosting' ? 'Hosting mode' : 'Renting mode'}
-                >
-                  <Text
-                    style={[
-                      typeScale.label,
-                      {
-                        color: active ? colors.titanium50 : colors.textSecondary,
-                      },
-                    ]}
-                  >
-                    {m === 'hosting' ? 'Hosting' : 'Renting'}
-                  </Text>
-                </AlpinePressable>
-              );
-            })}
-          </View>
-        </Card>
-
-        {/* ══ 3. MODE HUB ═════════════════════════════════════════════ */}
-        {mode === 'hosting' ? (
-          <>
-            <SectionTitle>Hosting Hub</SectionTitle>
-            <Card padded={false}>
-              <MenuRow
-                icon="briefcase-outline"
-                title="My Gear Listings"
-                subtitle={`${listingCount} active listing${listingCount !== 1 ? 's' : ''}`}
-                onPress={() => router.push(ROUTES.OWNER.INDEX)}
-                testID="manage-listings-row"
-              />
-              <RowDivider />
-              <MenuRow
-                icon="add-circle-outline"
-                title="List New Gear"
-                subtitle="Create a listing for your equipment"
-                onPress={() => router.push(ROUTES.OWNER.NEW_LISTING)}
-                testID="list-new-gear-row"
-              />
-              <RowDivider />
-              <MenuRow
-                icon="wallet-outline"
-                title="Earnings & Payouts"
-                subtitle={`${formatMoney(earningsMinor)} earned to date`}
-                onPress={() => router.push(ROUTES.OWNER.INDEX)}
-              />
-            </Card>
-          </>
-        ) : (
-          <>
-            <SectionTitle>Renter Hub</SectionTitle>
-            <Card padded={false}>
-              <MenuRow
-                icon="heart-outline"
-                title="Saved Gear"
-                subtitle={`${savedCount} saved item${savedCount !== 1 ? 's' : ''}`}
-                onPress={() => handlePlaceholder('Saved gear')}
-              />
-              <RowDivider />
-              <MenuRow
-                icon="receipt-outline"
-                title="Rental History & Receipts"
-                subtitle={`${rentalCount} rental${rentalCount !== 1 ? 's' : ''} on file`}
-                onPress={() => router.push(ROUTES.TABS.RENTALS)}
-              />
-            </Card>
-          </>
-        )}
 
         {/* ══ 4. TRUST & SAFETY ═══════════════════════════════════════ */}
         <SectionTitle>Verification & Trust</SectionTitle>
@@ -639,7 +722,175 @@ export default function AccountScreen() {
             testID="sign-out-row"
           />
         </Card>
-      </ScrollView>
+      </Animated.ScrollView>
+      </View>
+
+      {/* ── Collapsed header — white surface behind the shrunk avatar + name.
+          Rendered AFTER the scroll view so it always paints above it; the
+          avatar/name live inside the same container as the white surface,
+          so the background can never fail to cover them. ───────────── */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: insets.top + HEADER_ROW_HEIGHT,
+          zIndex: 10,
+        }}
+      >
+        {/* White surface */}
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: colors.white,
+            opacity: headerBgOpacity,
+          }}
+        />
+        {/* Collapsed name + verified tick */}
+        <Animated.View
+          style={{
+            position: 'absolute',
+            left: spacing.lg + COLLAPSED_AVATAR_SIZE + spacing.md,
+            right: 56,
+            top: insets.top,
+            height: HEADER_ROW_HEIGHT,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            opacity: headerNameOpacity,
+            transform: [{ translateY: headerNameTranslateY }],
+          }}
+        >
+          <Text
+            numberOfLines={1}
+            style={{
+              flexShrink: 1,
+              fontFamily: fontFamilies.spaceGrotesk.bold,
+              fontSize: rf(16),
+              lineHeight: rf(22),
+              color: colors.textPrimary,
+            }}
+          >
+            {profile?.fullName ?? user?.user_metadata?.full_name ?? 'User'}
+          </Text>
+          {profile?.verificationStatus === 'verified' && (
+            <Ionicons name="checkmark-circle" size={16} color={colors.verified} />
+          )}
+        </Animated.View>
+
+        {/* The ONE avatar that does the animation — rendered in the header
+            layer (above the white) only once the page has scrolled and the
+            origin is measured. It takes over from the in-content avatar's
+            exact spot, then shrinks and slides into the corner. */}
+        {scrolled && avatarBox && !reducedMotion && (
+          <Animated.View
+            accessibilityElementsHidden
+            style={{
+              position: 'absolute',
+              left: origin.x,
+              top: origin.y,
+              transform: [
+                { translateX: headerAvatarTranslateX },
+                { translateY: headerAvatarTranslateY },
+                { scale: headerAvatarScale },
+              ],
+            }}
+          >
+            {profile?.verificationStatus === 'verified' ? (
+              <View
+                style={{
+                  borderRadius: 9999,
+                  borderWidth: 3,
+                  borderColor: colors.verified,
+                  padding: 3,
+                  backgroundColor: colors.white,
+                }}
+              >
+                <Avatar
+                  uri={profile?.avatarUrl ?? null}
+                  name={profile?.fullName ?? user?.user_metadata?.full_name ?? 'User'}
+                  size={HERO_AVATAR_SIZE}
+                />
+              </View>
+            ) : (
+              <Avatar
+                uri={profile?.avatarUrl ?? null}
+                name={profile?.fullName ?? user?.user_metadata?.full_name ?? 'User'}
+                size={HERO_AVATAR_SIZE}
+              />
+            )}
+          </Animated.View>
+        )}
+
+        {/* Reduced motion: no travel — a static small avatar fades in at the
+            corner while the in-content one fades out (crossfade only). */}
+        {scrolled && reducedMotion && (
+          <Animated.View
+            accessibilityElementsHidden
+            style={{
+              position: 'absolute',
+              left: spacing.lg,
+              top: insets.top + (HEADER_ROW_HEIGHT - COLLAPSED_AVATAR_SIZE) / 2,
+              opacity: headerBgOpacity,
+            }}
+          >
+            {profile?.verificationStatus === 'verified' ? (
+              <View
+                style={{
+                  borderRadius: 9999,
+                  borderWidth: 3,
+                  borderColor: colors.verified,
+                  padding: 3,
+                  backgroundColor: colors.white,
+                }}
+              >
+                <Avatar
+                  uri={profile?.avatarUrl ?? null}
+                  name={profile?.fullName ?? user?.user_metadata?.full_name ?? 'User'}
+                  size={COLLAPSED_AVATAR_SIZE}
+                />
+              </View>
+            ) : (
+              <Avatar
+                uri={profile?.avatarUrl ?? null}
+                name={profile?.fullName ?? user?.user_metadata?.full_name ?? 'User'}
+                size={COLLAPSED_AVATAR_SIZE}
+              />
+            )}
+          </Animated.View>
+        )}
+      </Animated.View>
+
+      {/* ── Profile options — Edit / Share, text-only rows ──────────── */}
+      <OptionsMenu
+        visible={showOptionsMenu}
+        onClose={() => setShowOptionsMenu(false)}
+        anchorTop={optionsAnchorTop}
+        testID="profile-options-menu"
+      >
+        <OptionsMenuItem
+          label="Edit Profile"
+          onPress={() => {
+            setShowOptionsMenu(false);
+            handlePlaceholder('Profile editing');
+          }}
+          testID="edit-profile-item"
+        />
+        <OptionsMenuItem
+          label="Share Profile"
+          onPress={() => {
+            setShowOptionsMenu(false);
+            handleShareProfile();
+          }}
+          testID="share-profile-item"
+        />
+      </OptionsMenu>
 
       {/* ── Sign-out confirmation — critical account action → ask first ── */}
       <AlpineDialog

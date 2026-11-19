@@ -24,9 +24,10 @@ export type AnalyticsEvent =
     }
   | { name: 'rental_request_failed'; params?: { listingId: string; reason: string } }
   | { name: 'request_sent_viewed'; params?: { rentalId: string } }
-  | { name: 'rentals_viewed'; params?: { filter: 'all' | 'upcoming' | 'past' } }
+  | { name: 'rentals_viewed'; params?: { filter: 'borrowing' | 'lending' } }
   | { name: 'inbox_tab_changed'; params?: { tab: 'all' | 'updates' | 'archived' } }
   | { name: 'profile_viewed' }
+  | { name: 'profile_shared'; params?: { userId?: string } }
   | { name: 'profile_mode_toggled'; params?: { mode: 'hosting' | 'renting' } }
   | { name: 'authentication_required'; params?: { intent: string } }
   | { name: 'verification_required'; params?: { reason: string } }

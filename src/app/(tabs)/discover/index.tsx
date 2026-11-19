@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   Text,
   TextInput as RNTextInput,
+  Image,
   type ViewStyle,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -157,7 +158,7 @@ export default function DiscoverScreen() {
           accessibilityRole="button"
           accessibilityLabel={`${item?.name ?? 'Listing'}, ${(dailyPriceMinor / 100).toFixed(2)} per day`}
         >
-          {/* Image placeholder (100×100) */}
+          {/* Gear image (100×100) */}
           <View
             style={{
               width: 100,
@@ -169,7 +170,15 @@ export default function DiscoverScreen() {
               alignItems: 'center',
             }}
           >
-            <Ionicons name="image-outline" size={32} color={isDark ? colors.graphite500 : '#AEB4B7'} />
+            {listing.images?.[0]?.storagePath ? (
+              <Image
+                source={{ uri: listing.images[0].storagePath }}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="cover"
+              />
+            ) : (
+              <Ionicons name="image-outline" size={32} color={isDark ? colors.graphite500 : '#AEB4B7'} />
+            )}
           </View>
 
           {/* Content area */}

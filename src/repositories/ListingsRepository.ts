@@ -1,6 +1,7 @@
 import type { Listing, ListingMapItem } from '../types/listing';
 import type { ListingSearchInput } from '../types/search';
-import { mockListings, mockListingCoordinates } from '../mocks/data';
+import { mockListings, mockListingCoordinates, mockRentals } from '../mocks/data';
+import { getActiveRenterIds } from '../utils/rentalConflict';
 
 export interface ListingsRepository {
   getFeaturedListings(): Promise<Listing[]>;
@@ -12,14 +13,30 @@ export interface ListingsRepository {
 }
 
 export class MockListingsRepository implements ListingsRepository {
+  /**
+   * Anti-sub-letting rule: while a member is actively renting gear, their own
+   * listings are hidden from browse surfaces so they can't rent out gear they
+   * are also holding. Owner management views (account, owner centre) still
+   * show their catalog via getListingsByOwner.
+   */
+  private excludeActiveRenters(listings: Listing[]): Listing[] {
+    const hiddenOwnerIds = getActiveRenterIds(mockRentals);
+    if (hiddenOwnerIds.size === 0) return listings;
+    return listings.filter((l) => !hiddenOwnerIds.has(l.ownerId));
+  }
+
   async getFeaturedListings(): Promise<Listing[]> {
-    return mockListings.filter(
-      (l) => l.publishedStatus === 'published' && l.availabilityStatus === 'available',
+    return this.excludeActiveRenters(
+      mockListings.filter(
+        (l) => l.publishedStatus === 'published' && l.availabilityStatus === 'available',
+      ),
     );
   }
 
   async searchListings(input: ListingSearchInput): Promise<Listing[]> {
-    let results = mockListings.filter((l) => l.publishedStatus === 'published');
+    let results = this.excludeActiveRenters(
+      mockListings.filter((l) => l.publishedStatus === 'published'),
+    );
 
     if (input.query) {
       const q = input.query.toLowerCase();
@@ -126,8 +143,9 @@ export class MockListingsRepository implements ListingsRepository {
 
   async getSavedListings(_userId: string): Promise<Listing[]> {
     // Deterministic mock wishlist: always the same two saved listings.
-    return mockListings.filter(
-      (l) => l.id === 'listing-4' || l.id === 'listing-7',
+    // Saved is a browse surface too — hide listings of actively-renting owners.
+    return this.excludeActiveRenters(
+      mockListings.filter((l) => l.id === 'listing-4' || l.id === 'listing-7'),
     );
   }
 

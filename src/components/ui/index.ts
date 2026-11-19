@@ -14,6 +14,8 @@ export type { ChipVariant } from './Chip';
 export { Divider } from './Divider';
 export { Avatar } from './Avatar';
 export type { AvatarSize } from './Avatar';
+export { ProfileHero } from './ProfileHero';
+export type { ProfileHeroProps, ProfileHeroPresence } from './ProfileHero';
 export { MoneyText } from './MoneyText';
 export { StatusBadge } from './StatusBadge';
 export { StatusRail } from './StatusRail';export { BottomSheet } from './BottomSheet';

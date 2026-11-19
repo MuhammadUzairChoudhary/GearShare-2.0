@@ -14,7 +14,8 @@ import { OwnerSummaryCard } from '../../../components/ui/OwnerSummaryCard';
 import { LoadingState } from '../../../components/feedback/LoadingState';
 import { ErrorState } from '../../../components/feedback/ErrorState';
 import { useListing } from '../../../hooks/useListings';
-import { useCreateRentalRequest } from '../../../hooks/useRentals';
+import { useCreateRentalRequest, useUserRentals } from '../../../hooks/useRentals';
+import { getActiveHostingRentals } from '../../../utils/rentalConflict';
 import { useAuthContext } from '../../../features/auth/AuthProvider';
 import { useRentalDraftStore } from '../../../stores/useRentalDraftStore';
 import { spacing } from '../../../theme/spacing';
@@ -43,6 +44,14 @@ export default function RentalRequestScreen() {
   const [messageToOwner, setMessageToOwner] = useState('');
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Anti-sub-letting rule: while one of the requester's own listings is being
+  // rented out, requests are blocked until the gear is returned.
+  const { data: myRentals } = useUserRentals(user?.id ?? '');
+  const hostingBlock = useMemo(
+    () => getActiveHostingRentals(myRentals ?? [], user?.id ?? ''),
+    [myRentals, user?.id],
+  );
 
   const days = useMemo(() => {
     if (!startDate || !endDate) return 0;
@@ -156,6 +165,44 @@ export default function RentalRequestScreen() {
   }
 
   const gearItem = listing.gearItem;
+
+  // ── Blocked state — a listing of the requester is currently rented out ──
+  if (hostingBlock.length > 0) {
+    const outNames = hostingBlock
+      .map((r) => r.listing?.gearItem?.name)
+      .filter(Boolean)
+      .join(', ');
+    return (
+      <Screen>
+        <Stack.Screen
+          options={{
+            headerShown: true,
+            headerTitle: 'Rental Request',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.textPrimary,
+            headerLeft: () => <BackButton />,
+          }}
+        />
+        <View style={{ paddingTop: spacing.xxxl, gap: spacing.md }}>
+          <AppText variant="titleLarge" align="center">
+            You can't request rentals right now
+          </AppText>
+          <AppText variant="bodyMedium" color="textSecondary" align="center">
+            {outNames} — one of your listings — is currently being rented out. Rental requests
+            are paused until it's returned, so you can't rent out gear while holding gear
+            yourself.
+          </AppText>
+          <View style={{ marginTop: spacing.lg }}>
+            <AppButton
+              title="View My Rentals"
+              onPress={() => router.push(ROUTES.TABS.RENTALS)}
+              fullWidth
+            />
+          </View>
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>

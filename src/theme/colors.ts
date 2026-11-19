@@ -10,6 +10,8 @@ export const colors = {
   signalLime: '#C8FF3D',
   signalLimeDark: '#91C900',
   iceBlue: '#69C8E8',
+  // Trust — verification blue, the recognizable "verified" tick.
+  verified: '#1D9BF0',
 
   // Graphite neutrals
   graphite700: '#353A3D',

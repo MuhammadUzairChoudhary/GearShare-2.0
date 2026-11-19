@@ -65,7 +65,7 @@ Three font families:
 | `StatusBadge` | Status indicator with dot and label |
 | `StatusRail` | Rental lifecycle progress indicator (animates on state change) |
 | `ListingCard` | Equipment listing card for discover feed |
-| `RentalCard` | Rental summary card with status |
+| `RentalSummaryCard` | Compact rental card: gear thumbnail + 3-row grid (name/plain-text status, counterparty/charge, dates/deposit hold). Direction comes from the Borrowing/Lending tabs, so cards never prefix names with from/to |
 | `BottomSheet` | Modal bottom sheet with drag handle and controlled motion |
 | `AlpineDialog` | Destructive/short-choice confirmation modal: controlled backdrop, error palette, warning haptic |
 | `BackButton` | Standard back button — three surface modes: solid + hairline (theme background), `bare` (flat non-white surfaces: no stroke, no fill), `overContent` (translucent over imagery) |
